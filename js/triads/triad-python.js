@@ -37,8 +37,6 @@
 
 export const TRIADS_PY = `import math
 import numpy as np
-import scipy.signal
-from scipy.interpolate import griddata
 from fractions import Fraction
 from itertools import combinations_with_replacement
 from theory.calculations import (
@@ -114,6 +112,25 @@ def generate_triads(limit_value, equave_ratio, limit_mode="odd", max_exponent=3,
         out.append((cents(j / i), cents(k / j), "%d:%d:%d" % (i, j, k), complexity))
 
     return out
+
+
+def _fftconvolve_same(a, k):
+    """scipy.signal.fftconvolve(a, k, mode="same"), in numpy alone.
+
+    scipy was 48 MB of the page's first load and this and the resampling in
+    sethares_grid were all it was used for. Same arithmetic: multiply in the
+    frequency domain at a size that holds the full convolution, then crop to
+    a's shape, centred the way scipy centres it. Padded to a power of two so
+    the transform is never asked for an awkward length.
+    """
+    full = tuple(sa + sk - 1 for sa, sk in zip(a.shape, k.shape))
+    fast = tuple(1 << (n - 1).bit_length() for n in full)
+    if a.ndim == 1:
+        out = np.fft.irfft(np.fft.rfft(a, fast[0]) * np.fft.rfft(k, fast[0]), fast[0])
+    else:
+        out = np.fft.irfft2(np.fft.rfft2(a, fast) * np.fft.rfft2(k, fast), fast)
+    crop = tuple(slice((sk - 1) // 2, (sk - 1) // 2 + sa) for sa, sk in zip(a.shape, k.shape))
+    return out[crop]
 
 
 def _grid_shape(width):
@@ -233,8 +250,8 @@ def harmonic_entropy_grid(equave_ratio, width=420, n_limit=300, c_limit=27000000
     # FFT convolution rather than direct: the kernel is a few hundred pixels
     # across at the resolutions this is asked at, and direct convolution of two
     # squares that size is minutes rather than seconds.
-    p_k = scipy.signal.fftconvolve(k, s, mode="same")
-    p_ka = scipy.signal.fftconvolve(k_a, s ** alpha, mode="same")
+    p_k = _fftconvolve_same(k, s)
+    p_ka = _fftconvolve_same(k_a, s ** alpha)
 
     eps = 1e-16
     # fftconvolve can land a hair below zero where the true value is zero, and
@@ -307,20 +324,36 @@ def sethares_grid(spectrum_freq, spectrum_amp, ref_freq, equave_ratio,
             )
     total = total / 2.0
 
-    c1 = 1200.0 * np.log2(R)
-    c2 = 1200.0 * np.log2(np.maximum(S / R, 1e-12))
-
     top = float(np.nanmax(total))
     z = total / top if top > 0 else total
     z = np.power(np.maximum(1.0 - z, 0.0), float(z_ramp))
 
-    x_tri = (c1 + c2 / 2.0).ravel()
-    y_tri = (c2 * math.sqrt(3) / 2.0).ravel()
+    # The (r, s) grid is regular in ratio, so rather than triangulating it
+    # (which is what scipy's griddata did, and what scipy was being loaded
+    # for) each pixel is sent back through the triangle's map to its
+    # fractional place in that grid and read bilinearly from the four
+    # neighbours. Pixels that land outside the grid — below the r = s
+    # diagonal, or past the equave — are NaN, as griddata left them.
     xi = np.linspace(0.0, max_cents, width)
     yi = np.linspace(0.0, max_cents * math.sqrt(3) / 2.0, height)
     XI, YI = np.meshgrid(xi, yi)
-
-    out = griddata(np.vstack((x_tri, y_tri)).T, z.ravel(), (XI, YI), method="linear")
+    c2 = YI * 2.0 / math.sqrt(3)
+    c1 = XI - c2 / 2.0
+    R = np.power(2.0, c1 / 1200.0)
+    S = R * np.power(2.0, c2 / 1200.0)
+    n = rv.size
+    fi = (R - 1.0) / step
+    fj = (S - 1.0) / step
+    inside = (fi >= 0) & (fi <= n - 1) & (fj >= 0) & (fj <= n - 1)
+    fi = np.clip(fi, 0, n - 1)
+    fj = np.clip(fj, 0, n - 1)
+    i0 = np.minimum(fi.astype(np.int64), n - 2)
+    j0 = np.minimum(fj.astype(np.int64), n - 2)
+    ti = fi - i0
+    tj = fj - j0
+    out = ((1.0 - ti) * (1.0 - tj) * z[i0, j0] + ti * (1.0 - tj) * z[i0 + 1, j0]
+           + (1.0 - ti) * tj * z[i0, j0 + 1] + ti * tj * z[i0 + 1, j0 + 1])
+    out = np.where(inside, out, np.nan)
 
     std = (float(spread_cents) / max_cents) * width
     if std >= 0.5:
@@ -333,8 +366,8 @@ def sethares_grid(spectrum_freq, spectrum_amp, ref_freq, equave_ratio,
         filled = np.where(holes, 0.0, out)
         # Blur the field and the mask together and divide, so the edge of the
         # triangle is not dragged toward zero by the emptiness outside it.
-        num = scipy.signal.fftconvolve(filled, kernel, mode="same")
-        den = scipy.signal.fftconvolve((~holes).astype(np.float64), kernel, mode="same")
+        num = _fftconvolve_same(filled, kernel)
+        den = _fftconvolve_same((~holes).astype(np.float64), kernel)
         out = np.where(den > 1e-9, num / np.maximum(den, 1e-9), np.nan)
         out[holes] = np.nan
 

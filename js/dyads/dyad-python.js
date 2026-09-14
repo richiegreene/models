@@ -40,7 +40,6 @@
 
 export const DYADS_PY = `import math
 import numpy as np
-import scipy.signal
 from fractions import Fraction
 from theory.calculations import (
     get_odd_limit, get_integer_limit, check_prime_limit, parse_primes,
@@ -50,7 +49,7 @@ from theory.calculations import (
 # The same Plomp-Levelt kernel the triangle's surface is built from, imported
 # rather than copied: there is one statement of roughness in this app and both
 # modes are pictures of it.
-from triads_generator import _dissonance
+from triads_generator import _dissonance, _fftconvolve_same
 
 
 def generate_dyads(limit_value, axis_ratio, limit_mode="odd", max_exponent=3,
@@ -197,8 +196,8 @@ def harmonic_entropy_curve(axis_ratio, width=1600, n_limit=160, c_limit=1000000,
     axis = np.arange(-reach, reach + 1)
     s = np.exp(-(axis ** 2) / (2.0 * std ** 2))
 
-    p_k = scipy.signal.fftconvolve(k, s, mode="same")
-    p_ka = scipy.signal.fftconvolve(k_a, s ** alpha, mode="same")
+    p_k = _fftconvolve_same(k, s)
+    p_ka = _fftconvolve_same(k_a, s ** alpha)
 
     eps = 1e-16
     # fftconvolve can land a hair below zero where the true value is zero, and

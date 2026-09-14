@@ -23,10 +23,16 @@ async function initPyodide() {
     
     const loadingOverlay = document.getElementById('loading-overlay');
     loadingOverlay.style.display = 'flex';
+    /* numpy is named here rather than loaded after, so its wheel comes down
+       alongside the runtime instead of waiting for it. It is the only package:
+       scipy was 48 MB of the ~67 MB this screen used to wait for, and the two
+       things it was used for — an FFT convolution and a resample of the
+       Sethares grid — are done in numpy in triads_generator now. */
     setPyodide(await loadPyodide({
         indexURL: "https://cdn.jsdelivr.net/pyodide/v0.25.0/full/",
+        packages: ["numpy"],
     }));
-    console.log("Pyodide loaded.");
+    console.log("Pyodide and numpy loaded.");
 
     pyodide.setStdout({
         write: (msg) => {
@@ -38,9 +44,6 @@ async function initPyodide() {
             console.error("Python stderr:", msg);
         }
     });
-
-    await pyodide.loadPackage(["numpy", "scipy"]);
-    console.log("Numpy and Scipy loaded.");
 
     pyodide.FS.mkdir("python");
     pyodide.FS.mkdir("python/theory");
@@ -380,8 +383,6 @@ def generate_ji_tetra_labels(limit_value, equave_ratio, limit_mode='odd', max_ex
     pyodide.FS.writeFile("python/dyads_generator.py", DYADS_PY, { encoding: "utf8" });
 
     pyodide.runPython("import sys; sys.path.append('./python')");
-    await pyodide.loadPackage("micropip");
-    console.log("Micropip loaded.");
 
     setPythonReady(true);
     loadingOverlay.style.display = 'none';
