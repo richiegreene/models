@@ -2,10 +2,26 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <!-- viewport-fit=cover: the page claims the whole glass — under the notch
+         in landscape and, installed to the home screen, under the status bar
+         — and #app keeps its content clear of them with env(safe-area-inset-*),
+         see style.css. Without it iOS letterboxes the notch side. -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
     <title>models</title>
     <link rel="icon" href="favicon.png" type="image/png">
     <link rel="stylesheet" href="style.css">
+    <!-- Installable. "Add to Home Screen" from Safari or Chrome opens the app
+         standalone: no address bar, no toolbars, the full screen in either
+         orientation — and none of Chrome's rotate bug, since iOS runs a
+         home-screen web app in its own WebKit container whichever browser
+         installed it. In an ordinary tab these change nothing. -->
+    <link rel="manifest" href="manifest.webmanifest">
+    <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-title" content="Models">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="theme-color" content="#15161a">
     <script src="https://cdn.jsdelivr.net/pyodide/v0.25.0/full/pyodide.js"></script>
 </head>
 <body>
