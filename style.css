@@ -73,13 +73,7 @@ button,input,select,textarea{font-family:inherit}
 @font-face{font-family:"Bravura";src:url("fonts/Bravura.woff2") format("woff2");font-display:block}
 @font-face{font-family:"EdoAccidentals";src:url("fonts/notes.otf") format("opentype")}
 
-/* Edge to edge (viewport-fit=cover in index.html), so the status bar, the
-   notch and the home indicator are over the page rather than beside it; the
-   insets are what iOS says they cover — nothing on a desktop or in an
-   ordinary tab — and the panel and the stage are kept inside them. */
-#app{display:flex;height:100%;min-height:0;
-  padding:env(safe-area-inset-top,0px) env(safe-area-inset-right,0px)
-          env(safe-area-inset-bottom,0px) env(safe-area-inset-left,0px)}
+#app{display:flex;height:100%;min-height:0}
 
 /* ---------- side rail + drawer ---------- */
 #panel{display:flex;overflow:hidden;background:var(--panel);
