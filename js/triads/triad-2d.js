@@ -528,6 +528,12 @@ function drawLattice(o) {
 
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
+    /* As faint as the panel asks — Complexity channels › Opacity — so the
+       lattice can sit lightly over the field it is marking. */
+    const alpha = o.latticeOpacity ?? 1;
+    if (alpha <= 0) return;
+    ctx.save();
+    ctx.globalAlpha = alpha;
 
     for (const t of triads) {
         if (t.c1 + t.c2 > E + 1e-6) continue;
@@ -555,6 +561,7 @@ function drawLattice(o) {
             ctx.fillText(t.label, x, triadDots ? y - base - size * 0.6 : y);
         }
     }
+    ctx.restore();
 }
 
 function drawCursor(o) {

@@ -160,8 +160,9 @@ export function exportTriadSVG() {
         const range = complexityRange();
         const span = range.hi - range.lo;
         const base = Math.max(1.2, 3.6 * o.baseSize);
-        const dots = el('g');
-        const names = el('g', { 'font-family': 'monospace', 'text-anchor': 'middle' });
+        const faint = o.latticeOpacity ?? 1;
+        const dots = el('g', faint < 1 ? { opacity: f(faint) } : {});
+        const names = el('g', { 'font-family': 'monospace', 'text-anchor': 'middle', ...(faint < 1 ? { opacity: f(faint) } : {}) });
 
         for (const t of currentTriads()) {
             if (t.c1 + t.c2 > E + 1e-6) continue;

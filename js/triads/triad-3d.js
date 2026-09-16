@@ -642,7 +642,7 @@ export function rebuild(o, force = false) {
     const key = JSON.stringify([
         field ? [field.w, field.h, field.min, field.max] : null,
         triadRelief, triadFill, triadLines, triadContours, triadDots, triadLabels,
-        o.equaveRatio, o.baseSize, o.scalingFactor, o.enableSize, o.enableColor,
+        o.equaveRatio, o.baseSize, o.scalingFactor, o.enableSize, o.enableColor, o.latticeOpacity,
         layoutSignature(currentLayoutMode), triadGloss, currentTriads().length,
     ]);
     if (!force && key === builtKey) return;
@@ -959,8 +959,13 @@ function buildLattice(E, o) {
     geo.setAttribute('color', new THREE.Float32BufferAttribute(cols, 3));
     /* One Points object rather than one sphere each: a 15-limit set is a few
        hundred dots and a 27-limit one is tens of thousands. */
+    const faint = o.latticeOpacity ?? 1;
     return new THREE.Points(geo, new THREE.PointsMaterial({
         size: 0.035 * o.baseSize * SIDE / 3, vertexColors: true, sizeAttenuation: true,
+        /* As faint as the panel asks — Complexity channels › Opacity. Depth
+           is left unwritten by a faint point so the surface behind it is not
+           cut out where the point was. */
+        transparent: faint < 1, opacity: faint, depthWrite: faint >= 1,
     }));
 }
 
@@ -1011,6 +1016,7 @@ function buildLabels(E, o) {
         const c = latticeColor(t, range, o);
         const css = `rgb(${Math.round(c.r * 255)},${Math.round(c.g * 255)},${Math.round(c.b * 255)})`;
         const sprite = labelSprite(t.label, css);
+        sprite.material.opacity = o.latticeOpacity ?? 1;
         const p = liftTriad(t, E, field);
         sprite.position.set(p.x, p.y + 0.05, p.z);
         const s = 0.12 * o.baseSize;

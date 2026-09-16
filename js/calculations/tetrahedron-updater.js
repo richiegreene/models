@@ -80,18 +80,20 @@ export async function setLayoutMode(index) {
     const enableSize = document.getElementById('enableSize').checked;
     const enableColor = document.getElementById('enableColor').checked;
     const layoutDisplay = document.getElementById('layoutDisplay').value;
+    const latticeOpacity = Math.min(1, Math.max(0,
+        (parseFloat(document.getElementById('latticeOpacity').value) || 0) / 100));
     
     await updateTetrahedron(
         limitType, limitValue, maxExponent, virtualFundamentalFilter, equaveRatio, complexityMethod, 
         hideUnisonVoices, omitOctaves, baseSize, scalingFactor, 
-        enableSize, enableColor, layoutDisplay
+        enableSize, enableColor, layoutDisplay, latticeOpacity
     );
     /* The field reads the same ramp through a lookup table of its own, so
        the two cannot be recoloured separately. */
     restyleField();
 }
 
-export async function updateTetrahedron(limit_type, limit_value, max_exponent, virtual_fundamental_filter, equave_ratio, complexity_method, hide_unison_voices, omit_octaves, base_size, scaling_factor, enable_size, enable_color, layout_display) {
+export async function updateTetrahedron(limit_type, limit_value, max_exponent, virtual_fundamental_filter, equave_ratio, complexity_method, hide_unison_voices, omit_octaves, base_size, scaling_factor, enable_size, enable_color, layout_display, lattice_opacity = 1) {
     if (!python_ready) {
         console.warn("Python environment not ready yet. Please wait.");
         return;
@@ -203,6 +205,8 @@ export async function updateTetrahedron(limit_type, limit_value, max_exponent, v
         /* On a screened page a translucent point is a grey, and the page has
            none: the marks are the ink, solid. */
         if (halftoneOn()) spritePointOpacity = 1;
+        /* And then as faint as the panel asks — Complexity channels › Opacity. */
+        spritePointOpacity *= lattice_opacity;
 
         /* Screened, every mark is in the ink — the same path Color-off takes,
            which already picks black or white by the ground. */
@@ -240,6 +244,8 @@ export async function updateTetrahedron(limit_type, limit_value, max_exponent, v
         if (layout_display === 'labels') {
             if (label_text) {
                 const sprite = makeTextSprite(label_text, { textColor: spriteTextColor });
+                sprite.material.transparent = true;
+                sprite.material.opacity = lattice_opacity;
                 sprite.position.set(transformed_x + 0.05, transformed_y + 0.05, transformed_z);
                 sprite.userData.normalizedComplexity = invertedComplexity;
                 sprite.userData.baseSize = internal_label_base_size;

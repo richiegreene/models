@@ -74,6 +74,7 @@ import {
     applyPivot as applyDyadPivot, resetReference as resetDyadReference,
 } from '../dyads/dyad-mode.js';
 import { buildHeControls } from '../he/he-controls.js';
+import { readPanel } from './read-panel.js';
 import {
     theParams, tetradModel, setTetradModel, setTetradSlice, setTetradVolume,
     setTetradAxis, setTetradPosition, tetradSweep, setTetradSweep,
@@ -786,6 +787,9 @@ export function setupUIEventListeners() {
     for (const id of ['baseSize', 'scalingFactor']) {
         $(id).addEventListener('input', () => restyle({ rebuild: true }));
     }
+    press('latticeOpacity', 'lattice-opacity-v',
+        () => restyle({ rebuild: true }),
+        (v) => `${Math.round(v)}%`);
 
     /* ---------------- the halftone ----------------
      * One state for the three modes, like the colormap it stands in for.
@@ -1425,6 +1429,7 @@ export function setupUIEventListeners() {
             $('hideUnisonVoices').checked, $('omitOctaves').checked,
             parseFloat($('baseSize').value), parseFloat($('scalingFactor').value),
             $('enableSize').checked, $('enableColor').checked, $('layoutDisplay').value,
+            readPanel().latticeOpacity,
         );
         return true;
     }

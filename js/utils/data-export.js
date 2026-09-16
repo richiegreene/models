@@ -84,6 +84,7 @@ export function exportToSVG() {
             } else {
                 text.setAttribute('fill', 'white');
             }
+            if (sprite.material.opacity < 1) text.setAttribute('fill-opacity', sprite.material.opacity);
             
             text.textContent = sprite.userData.ratio;
             svg.appendChild(text);

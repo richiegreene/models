@@ -58,5 +58,7 @@ export function readPanel() {
         scalingFactor: parseFloat($('scalingFactor').value),
         enableSize: $('enableSize').checked,
         enableColor: $('enableColor').checked,
+        /* 0..1: how faint the lattice's dots and labels are drawn. */
+        latticeOpacity: Math.min(1, Math.max(0, (parseFloat($('latticeOpacity').value) || 0) / 100)),
     };
 }

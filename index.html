@@ -590,6 +590,17 @@
             <input type="range" id="baseSize" value="1.00" min="0.25" max="2.50" step="0.01">
             <label for="scalingFactor">Measure</label>
             <input type="range" id="scalingFactor" value="2" min="0.50" max="3.00" step="0.01">
+
+            <!-- How faint the marks are, so a lattice can sit lightly over a
+                 field that is the thing being read. Triads and Tetrads, whose
+                 marks lie ON a picture; the plot's stems are the picture. -->
+            <div class="pressrow" data-mode="triads tetrads" style="margin-top:7px">
+              <label for="latticeOpacity">Opacity</label>
+              <span class="pressval" id="lattice-opacity-v">100%</span>
+            </div>
+            <input type="range" id="latticeOpacity" value="100" min="0" max="100" step="1"
+              data-mode="triads tetrads"
+              title="How faint the dots and labels are drawn, so the lattice can sit lightly over the field beneath it. At 0 it is gone; at 100 it is solid.">
           </fieldset>
 
           <fieldset id="omit-fieldset">
