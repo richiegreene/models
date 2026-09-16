@@ -9,6 +9,7 @@ import {
 import { transformToRegularTetrahedron, makeTextSprite, makePointSprite } from '../components/three-visualizer.js';
 import { colormapAt, COLORMAP_COUNT, isLightGround } from './color-mapping.js';
 import { restyleField } from '../tetrads/tetrad-field.js';
+import { halftoneOn } from './halftone.js';
 
 /* ---- the set, as numbers ----
    The sprites used to be the only record of which tetrads had been
@@ -199,8 +200,13 @@ export async function updateTetrahedron(limit_type, limit_value, max_exponent, v
         if (onLightGround) {
             spritePointOpacity = 0.9;
         }
+        /* On a screened page a translucent point is a grey, and the page has
+           none: the marks are the ink, solid. */
+        if (halftoneOn()) spritePointOpacity = 1;
 
-        if (enable_color) {
+        /* Screened, every mark is in the ink — the same path Color-off takes,
+           which already picks black or white by the ground. */
+        if (enable_color && !halftoneOn()) {
             const colorScalingFactor = scaling_factor / 2;
             let scaledComplexity = invertedComplexity * colorScalingFactor;
             scaledComplexity = Math.min(1, Math.max(0, scaledComplexity));

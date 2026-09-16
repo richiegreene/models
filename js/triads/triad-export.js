@@ -23,7 +23,8 @@ import {
     triadFill, triadLines, triadContours, triadLineWidth, triadDots, triadLabels, triadView, triadGloss,
 } from './triad-state.js';
 import { currentTriads, currentField, currentFieldModel, complexityRange } from './triad-surface.js';
-import { colormap, colormapFn, onLight, groundColor, contourSegments, paintField } from './triad-2d.js';
+import { colormap, colormapFn, onLight, groundColor, contourSegments, paintField, buildMarks } from './triad-2d.js';
+import { halftoneOn, inkCss, marksToSvg } from '../calculations/halftone.js';
 import { domElement as gl3d, frameTight, restoreFrame } from './triad-3d.js';
 import { groundCss, lighting } from '../calculations/color-mapping.js';
 import { downloadSVG, downloadCSV, simplifyFraction } from '../utils/data-export.js';
@@ -79,7 +80,7 @@ export function exportTriadSVG() {
     const height = (pane && pane.clientHeight) || 780;
     const fit = fitTriangle(width, height);
     const light = onLight();
-    const ink = light ? '#111111' : '#ffffff';
+    const ink = halftoneOn() ? inkCss() : light ? '#111111' : '#ffffff';
 
     const svg = el('svg', {
         xmlns: NS, 'xmlns:xlink': 'http://www.w3.org/1999/xlink',
@@ -101,7 +102,12 @@ export function exportTriadSVG() {
     const field = currentField();
     const clipped = el('g', { 'clip-path': 'url(#tri)' });
 
-    if (field && triadFill) {
+    if (field && triadFill && halftoneOn()) {
+        /* The screen as vectors — every dot a circle, every hatch a path —
+           which is the whole reason a halftone is worth having in a file: it
+           is the one shading of a field that is not a raster. */
+        clipped.appendChild(marksToSvg(el, f, buildMarks(field, fit)));
+    } else if (field && triadFill) {
         const img = el('image', {
             x: f(fit.originX),
             y: f(fit.originY - fit.side * SQRT3_2),
@@ -114,10 +120,10 @@ export function exportTriadSVG() {
         img.setAttributeNS('http://www.w3.org/1999/xlink', 'xlink:href', fieldImage(field));
         img.setAttribute('href', fieldImage(field));
         clipped.appendChild(img);
-    } else if (!(field && triadLines)) {
+    } else if (!(field && triadLines) && !halftoneOn()) {
         /* No plate under a lines-only picture, matching the pane — see draw in
            triad-2d.js. The file is then contours on the page's own ground,
-           which is what was on screen. */
+           which is what was on screen. Nor under a screened one. */
         clipped.appendChild(el('polygon', { points, fill: light ? '#f2f3f6' : '#0b0c10' }));
     }
 
@@ -141,16 +147,13 @@ export function exportTriadSVG() {
                 d: d.join(''),
                 fill: 'none',
                 'stroke-width': f(triadLineWidth),
-                stroke: triadFill ? ink : `rgb(${Math.round(c.r * 255)},${Math.round(c.g * 255)},${Math.round(c.b * 255)})`,
-                'stroke-opacity': triadFill ? 0.3 : 1,
+                stroke: halftoneOn() ? inkCss()
+                    : triadFill ? ink : `rgb(${Math.round(c.r * 255)},${Math.round(c.g * 255)},${Math.round(c.b * 255)})`,
+                'stroke-opacity': triadFill && !halftoneOn() ? 0.3 : 1,
             }));
         }
     }
     svg.appendChild(clipped);
-
-    svg.appendChild(el('polygon', {
-        points, fill: 'none', stroke: ink, 'stroke-opacity': light ? 0.45 : 0.35,
-    }));
 
     if (triadDots || triadLabels) {
         const E = equaveCents(o.equaveRatio);

@@ -223,21 +223,20 @@
           <fieldset data-mode="tetrads" class="mode-off">
             <legend>Model</legend>
             <div class="seg" id="tetrad-model-seg">
-              <button data-v="blank" class="on"
+              <button data-v="blank"
                 title="No field: the just-intonation tetrads on their own">Blank</button>
-              <button data-v="he"
+              <button data-v="he" class="on"
                 title="Harmonic entropy over the whole tetrahedron — how many simple readings of the sonority the ear has to choose between, at every point, in just intonation or not">Entropy</button>
             </div>
 
             <!-- Built by he-controls.js, over theParams. -->
-            <div id="the-params" class="he-params" style="display:none"></div>
+            <div id="the-params" class="he-params"></div>
 
-            <div class="pressrow" id="tetrad-res-row" style="display:none">
+            <div class="pressrow" id="tetrad-res-row">
               <label for="tetradResolution">Resolution</label>
               <span class="pressval" id="tetrad-res-v">128³</span>
             </div>
             <input type="range" id="tetradResolution" min="48" max="160" step="8" value="128"
-              style="display:none"
               title="Cells per axis of the volume the model is computed on. 128 is a cell of about nine cents over an octave, a few seconds to compute; the readout says the cell, and the foot says if it is too coarse for the order asked for.">
           </fieldset>
 
@@ -484,7 +483,11 @@
               title="How close the pointer must come to a just triad before it lands on it exactly. At 0 the surface is continuous everywhere.">
           </fieldset>
 
-          <fieldset data-mode="tetrads" class="mode-off">
+          <!-- The Complexity channels fieldset is moved in here while Tetrads
+               is up — see placeLatticeGroup in ui-handlers.js — because size
+               and colour are properties of the marks, and go away with them
+               when None is chosen. -->
+          <fieldset data-mode="tetrads" class="mode-off" id="tetrad-type-fieldset">
             <legend>Type/Setting</legend>
             <div class="seg" id="layout-seg">
               <button data-v="points" class="on" title="One point per tetrad">Points</button>
@@ -508,55 +511,62 @@
                and makes it mean something: holding the span fixes the outer
                interval and lets the two inner voices roam; holding the lower
                interval leaves a triangle of triads over a fixed bass step. -->
-          <fieldset data-mode="tetrads" class="mode-off" id="tetrad-field-fieldset" style="display:none">
+          <fieldset data-mode="tetrads" class="mode-off" id="tetrad-field-fieldset">
             <legend>Field</legend>
             <div class="seg" id="tetrad-show-seg">
-              <button data-v="tetradSlice" class="on"
+              <button data-v="tetradSlice"
                 title="A plane through the field, opaque, coloured by the entropy where it cuts. ⇧-drag across it to play the tetrad under the pointer.">Cut</button>
               <button data-v="tetradVolume" class="on"
                 title="The whole field as a translucent body: concordance is opaque, discordance is clear, so the simplest chords hang in it as wells.">Body</button>
             </div>
 
-            <div class="tune-h">Cut along</div>
-            <div class="seg" id="tetrad-axis-seg">
-              <button data-v="span" class="on"
-                title="Every tetrad with the same outer interval, bass to soprano; the two inner voices roam the triangle. From the apex (a unison) to the base (an equave).">Span</button>
-              <button data-v="lower"
-                title="The lower interval held: a triangle of triads over a fixed bass step.">Lower</button>
-              <button data-v="middle"
-                title="The middle interval held.">Middle</button>
-              <button data-v="upper"
-                title="The upper interval held: a triangle of triads under a fixed top step.">Upper</button>
+            <!-- The cut's own settings, shown with it: where it is, which way
+                 it faces, and how a drag on it snaps. Shut with the switch. -->
+            <div id="tetrad-cut-params" hidden>
+              <div class="tune-h">Cut along</div>
+              <div class="seg" id="tetrad-axis-seg">
+                <button data-v="span" class="on"
+                  title="Every tetrad with the same outer interval, bass to soprano; the two inner voices roam the triangle. From the apex (a unison) to the base (an equave).">Span</button>
+                <button data-v="lower"
+                  title="The lower interval held: a triangle of triads over a fixed bass step.">Lower</button>
+                <button data-v="middle"
+                  title="The middle interval held.">Middle</button>
+                <button data-v="upper"
+                  title="The upper interval held: a triangle of triads under a fixed top step.">Upper</button>
+              </div>
+
+              <div class="pressrow">
+                <label for="tetradPosition">Position</label>
+                <span class="pressval" id="tetrad-pos-v">600 ¢</span>
+              </div>
+              <input type="range" id="tetradPosition" min="0" max="1000" step="1" value="500"
+                title="Where the cut is: the held interval, in cents.">
+              <button id="tetradSweep"
+                title="Move the cut back and forth through the whole shape on its own — a pass every eight seconds. The slider follows it.">&#8646; Sweep the cut</button>
+
+              <div class="pressrow">
+                <label for="tetradSnap">Snap</label>
+                <span class="pressval" id="tetrad-snap-v">off</span>
+              </div>
+              <input type="range" id="tetradSnap" min="0" max="40" step="1" value="0"
+                title="How close the pointer must come to a just tetrad of the set, in cents, before it lands on it exactly. At 0 the cut is continuous everywhere.">
             </div>
 
-            <div class="pressrow">
-              <label for="tetradPosition">Position</label>
-              <span class="pressval" id="tetrad-pos-v">600 ¢</span>
+            <!-- And the body's, likewise. -->
+            <div id="tetrad-body-params">
+              <div class="pressrow">
+                <label for="tetradDensity">Density</label>
+                <span class="pressval" id="tetrad-density-v">60%</span>
+              </div>
+              <input type="range" id="tetradDensity" min="0" max="100" step="1" value="60"
+                title="How opaque the body is. Low is a haze only the deepest wells show through; high is a solid you have to cut to see into.">
+              <div class="pressrow">
+                <label for="tetradFocus">Focus</label>
+                <span class="pressval" id="tetrad-focus-v">3.0</span>
+              </div>
+              <input type="range" id="tetradFocus" min="0.5" max="6" step="0.1" value="3"
+                title="How sharply the wells stand out of the body. At 1 the whole tetrahedron is a mist; at 4 only the most concordant few percent deposit anything, and the volume resolves into a constellation of the simplest chords.">
             </div>
-            <input type="range" id="tetradPosition" min="0" max="1000" step="1" value="500"
-              title="Where the cut is: the held interval, in cents.">
-            <button id="tetradSweep"
-              title="Move the cut back and forth through the whole shape on its own — a pass every eight seconds. The slider follows it.">&#8646; Sweep the cut</button>
-
-            <div class="pressrow">
-              <label for="tetradDensity">Density</label>
-              <span class="pressval" id="tetrad-density-v">60%</span>
-            </div>
-            <input type="range" id="tetradDensity" min="0" max="100" step="1" value="60"
-              title="How opaque the body is. Low is a haze only the deepest wells show through; high is a solid you have to cut to see into.">
-            <div class="pressrow">
-              <label for="tetradFocus">Focus</label>
-              <span class="pressval" id="tetrad-focus-v">3.0</span>
-            </div>
-            <input type="range" id="tetradFocus" min="0.5" max="6" step="0.1" value="3"
-              title="How sharply the wells stand out of the body. At 1 the whole tetrahedron is a mist; at 4 only the most concordant few percent deposit anything, and the volume resolves into a constellation of the simplest chords.">
-
-            <div class="pressrow">
-              <label for="tetradSnap">Snap</label>
-              <span class="pressval" id="tetrad-snap-v">off</span>
-            </div>
-            <input type="range" id="tetradSnap" min="0" max="40" step="1" value="0"
-              title="How close the pointer must come to a just tetrad of the set, in cents, before it lands on it exactly. At 0 the cut is continuous everywhere.">
           </fieldset>
 
           <!-- ---- what complexity is allowed to say ----
@@ -667,6 +677,35 @@
             <input type="range" id="triadGloss" min="0" max="100" step="1" value="30"
               data-mode="triads"
               title="How wet the lifted surface is. On Constant this is matte through to a mirror; on the colour ramps it adds a highlight over the top without touching the colours underneath.">
+
+            <!-- ---- one ink ----
+                 The one layout that is not a colour. A screen of dots, of
+                 hatching or of crosshatching says the value by how much of
+                 each cell it inks, on a ground that is pure black or pure
+                 white with the theme — a textbook's figure rather than a
+                 screen's. It stands in for whichever ramp is chosen above,
+                 in all three modes, and the exports come out as vectors: a
+                 circle per dot, a path per hatch. Size is the pitch of the
+                 screen, in pixels. -->
+            <div class="tune-h">Halftone</div>
+            <div class="seg" id="halftone-seg">
+              <button data-v="off" class="on"
+                title="The colour layout chosen above, as it is.">Off</button>
+              <button data-v="dots"
+                title="A screen of round dots on a 45° lattice, each one's area the value at its centre — the printed halftone.">Dots</button>
+              <button data-v="lines"
+                title="A hatch of parallel lines whose weight is the value.">Lines</button>
+              <button data-v="cross"
+                title="Two hatches crossed, weighted so that together they cover exactly the value.">Cross</button>
+            </div>
+            <div id="halftone-params" hidden>
+              <div class="pressrow">
+                <label for="halftoneSize">Size</label>
+                <span class="pressval" id="halftone-size-v">6 px</span>
+              </div>
+              <input type="range" id="halftoneSize" min="2" max="24" step="0.5" value="6"
+                title="The pitch of the screen — how far apart its cells are, in pixels. Fine is a tone; coarse is a texture you can count.">
+            </div>
 
             <!-- ---- how fast the shape turns ----
                  The arrow keys have always turned the tetrahedron and [ ]

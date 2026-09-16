@@ -9,8 +9,9 @@
  * a control that only exists here has no business being read anywhere else.
  * ------------------------------------------------------------------ */
 
-/** What the tetrahedron is filled with. 'blank' is the points on their own. */
-export let tetradModel = 'blank'; // 'blank' | 'he'
+/** What the tetrahedron is filled with. 'blank' is the points on their own;
+ *  it opens on the field, which is what the mode is for. */
+export let tetradModel = 'he'; // 'blank' | 'he'
 export function setTetradModel(v) { tetradModel = v; }
 
 /* ---- the model's parameters ----
@@ -30,8 +31,9 @@ export const theParams = {
    Two independent switches, like the triangle's Fill and Lines: the CUT is
    an opaque triangle through the field, the VOLUME is the whole field as a
    translucent body. Either alone, or both — a bright section through a
-   ghost, which is the tomograph's own picture. */
-export let tetradSlice = true;
+   ghost, which is the tomograph's own picture. It opens on the body alone;
+   the cut is something to reach for. */
+export let tetradSlice = false;
 export let tetradVolume = true;
 export function setTetradSlice(v) { tetradSlice = v; }
 export function setTetradVolume(v) { tetradVolume = v; }

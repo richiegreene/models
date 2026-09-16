@@ -58,6 +58,9 @@ body.bright #notation-display{background:rgba(255,255,255,.92);
   border-color:#c9cad0;color:#1b1c20}
 
 *{box-sizing:border-box}
+/* The attribute has to win over the author rules that give a row `display:
+   flex`, or a control hidden by it would stay on the page. */
+[hidden]{display:none !important}
 /* Same Inter the Notation app is set in, so the three apps read as one. */
 @font-face{font-family:"Inter";src:url("fonts/inter.ttf") format("opentype")}
 html,body{margin:0;height:100%;overflow:hidden;background:var(--bg);color:var(--text);
@@ -209,6 +212,9 @@ body[data-mode="triads"] #panel-status{justify-content:flex-start}
 h1{font-size:15px;margin:2px 0 12px;color:var(--text);font-weight:600}
 h1 small{color:var(--dim);font-weight:400}
 fieldset{border:1px solid var(--line);border-radius:8px;margin:0 0 12px;padding:9px 11px}
+/* A fieldset inside a fieldset is a subcategory — Tetrads' Complexity
+   channels under Type/Setting — and sits tight to the controls above it. */
+fieldset fieldset{margin:6px 0 2px}
 legend{color:var(--dim);font-size:10.5px;font-weight:400;letter-spacing:.03em;padding:0 6px}
 label{display:block;color:var(--dim);font-size:11px;margin:7px 0 3px}
 select,input[type=number],input[type=text]{width:100%;background:var(--panel2);color:var(--text);
@@ -226,6 +232,10 @@ button.primary:hover{border-color:var(--accent);color:#fff}
 button.latched{background:#24405c;border-color:var(--accent);color:#cfe6ff}
 #autoRotate,#tetradSweep{width:100%;margin-top:8px}
 
+/* With a halftone on, the chips still say what the layouts are, but none of
+   them is what is on screen; they dim and stand down until it is off. */
+.maps.screened .map{opacity:.35;pointer-events:none}
+
 /* ---------- the entropy's own block ----------
    Built by he-controls.js for the three modes. The letter after a label is
    the wiki's own symbol for the setting — s, a, N — set apart from the word
@@ -238,6 +248,8 @@ button.latched{background:#24405c;border-color:var(--accent);color:#cfe6ff}
 .he-col{flex:1 1 0;min-width:0}
 .he-col .tune-h{margin-top:9px}
 .he-col .seg{margin-bottom:6px}
+/* Two words in half the width: a touch smaller, so "Laplace" is not "Lapla…". */
+.he-col .seg button{padding:4px 2px;font-size:10.5px}
 .hint{color:var(--dim);font-size:10.5px;margin-top:6px}
 .symbol{font-family:Arial,sans-serif}
 

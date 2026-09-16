@@ -21,6 +21,7 @@ import {
 } from './dyad-state.js';
 import { currentDyads, currentCurve, currentCurveModel, complexityRange } from './dyad-curve.js';
 import { colormapFn, onLight, groundColor, verticalAxis, marksAreLegible } from './dyad-2d.js';
+import { halftoneOn, screenMarks, marksToSvg, inkCss } from '../calculations/halftone.js';
 import { groundCss } from '../calculations/color-mapping.js';
 import { downloadSVG, downloadCSV, simplifyFraction } from '../utils/data-export.js';
 import { readPanel } from '../utils/read-panel.js';
@@ -51,7 +52,7 @@ export function exportDyadSVG() {
     const fit = dyadGrid ? fitPlot(width, height)
                          : fitPlot(width, height, { padL: 18, padR: 18, padT: 18, padB: 18 });
     const light = onLight();
-    const ink = light ? '#111111' : '#ffffff';
+    const ink = halftoneOn() ? inkCss() : light ? '#111111' : '#ffffff';
     const inkA = (a) => (light ? `rgba(0,0,0,${a})` : `rgba(255,255,255,${a})`);
 
     const C = axisCents(o.equaveRatio, dyadSpan);
@@ -137,7 +138,7 @@ export function exportDyadSVG() {
            afford a coarse ramp, but a stroke a few pixels wide IS the ramp,
            and a spike narrower than a stop would take its colour from its
            neighbour. */
-        if (dyadFill || dyadLine) {
+        if ((dyadFill || dyadLine) && !halftoneOn()) {
             const map = colormapFn();
             const defs = el('defs');
             const grad = el('linearGradient', {
@@ -157,18 +158,35 @@ export function exportDyadSVG() {
             svg.appendChild(defs);
         }
 
-        if (dyadFill) {
+        const areaPath = `${line}L${f(fit.x1)} ${f(yFloor)}L${f(fit.x0)} ${f(yFloor)}Z`;
+        if (dyadFill && halftoneOn()) {
+            /* The screen as vectors, cut to the area under the curve — the
+               same marks the pane draws, each cell inked by its column. */
+            const defs = el('defs');
+            const clip = el('clipPath', { id: 'dyad-area' });
+            clip.appendChild(el('path', { d: areaPath }));
+            defs.appendChild(clip);
+            svg.appendChild(defs);
+            const g = el('g', { 'clip-path': 'url(#dyad-area)' });
+            g.appendChild(marksToSvg(el, f, screenMarks(fit.x0, fit.y1, fit.x1, fit.y0, (px) => {
+                const i = Math.round(px - fit.x0);
+                if (i < 0 || i >= cols) return NaN;
+                return vals[i];
+            })));
+            svg.appendChild(g);
+        } else if (dyadFill) {
             svg.appendChild(el('path', {
-                d: `${line}L${f(fit.x1)} ${f(yFloor)}L${f(fit.x0)} ${f(yFloor)}Z`,
+                d: areaPath,
                 fill: 'url(#dyad-ramp)', stroke: 'none',
             }));
         }
         if (dyadLine) {
             /* Through the ramp whether or not there is a fill under it — see
-               drawCurve in dyad-2d.js, which this is a picture of. */
+               drawCurve in dyad-2d.js, which this is a picture of. In the ink
+               when the picture is a screen. */
             svg.appendChild(el('path', {
                 d: line, fill: 'none',
-                stroke: 'url(#dyad-ramp)',
+                stroke: halftoneOn() ? ink : 'url(#dyad-ramp)',
                 'stroke-width': f(dyadLineWidth),
                 'stroke-linejoin': 'round', 'stroke-linecap': 'round',
             }));
@@ -211,7 +229,7 @@ export function exportDyadSVG() {
                 const r = o.enableSize ? base * (1 + (1 - norm) * (o.scalingFactor - 1)) : base;
                 stems.appendChild(el('line', {
                     x1: f(x), y1: f(yFloor), x2: f(x), y2: f(y),
-                    stroke: fill, 'stroke-opacity': 0.5,
+                    stroke: fill, 'stroke-opacity': halftoneOn() ? 1 : 0.5,
                 }));
                 dots.appendChild(el('circle', {
                     cx: f(x), cy: f(y), r: f(Math.max(0.6, r)), fill,

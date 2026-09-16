@@ -41,8 +41,9 @@ import { saveTriadSVG, saveTriadPNG, exportTriadCSV } from '../triads/triad-expo
 import { saveDyadSVG, saveDyadPNG, exportDyadCSV } from '../dyads/dyad-export.js';
 import {
     colormaps, COLORMAP_COUNT, constantColors, setConstantColor,
-    isLightGround, groundCss, currentTheme, setTheme, themeIsLight,
+    isLightGround, groundCss, currentTheme, setTheme, themeIsLight, layoutSignature,
 } from '../calculations/color-mapping.js';
+import { halftone, halftoneOn } from '../calculations/halftone.js';
 import { estimateWork, sayWork, WORK_BUDGET } from '../calculations/work-estimate.js';
 import { initMidiOutput, sendMpePressure, mpeChannels } from '../midi/midi-output.js';
 import { createTimbrePicker, FILTERED_MIN } from '../synth/timbre.js';
@@ -80,7 +81,7 @@ import {
 } from '../tetrads/tetrad-state.js';
 import {
     initTetrads, generateTetradField, refreshFieldIfStale, applySlice, applyBody,
-    leaveTetrads, describeSet as describeTetrads,
+    applyStyle as applyTetradStyle, leaveTetrads, describeSet as describeTetrads,
 } from '../tetrads/tetrad-mode.js';
 import { resetTetradReference } from '../tetrads/tetrad-audio.js';
 import { equaveCents } from '../tetrads/tetrad-geometry.js';
@@ -523,7 +524,12 @@ export function setupUIEventListeners() {
     const updateChannelVisibility = () => {
         const latticeEmpty = (appMode === 'triads' && !triadDots && !triadLabels)
                           || (appMode === 'dyads' && !dyadDots && !dyadLabels);
-        channelFieldset.classList.toggle('mode-off', latticeEmpty);
+        /* In Tetrads the marks can be taken away altogether (Type/Setting ›
+           None), and size and colour are properties of the marks — but the
+           limit and the omit filters still decide the set the CSV and the
+           snap read, so only the channels go. */
+        const marksOff = appMode === 'tetrads' && $('layoutDisplay').value === 'none';
+        channelFieldset.classList.toggle('mode-off', latticeEmpty || marksOff);
         omitFieldset.classList.toggle('mode-off', latticeEmpty);
         limitFieldset.classList.toggle('mode-off', latticeEmpty);
         complexityFieldset.classList.toggle('mode-off', latticeEmpty);
@@ -548,6 +554,10 @@ export function setupUIEventListeners() {
         } else {
             for (const [el, parent, next] of latticeHomes) parent.insertBefore(el, next);
         }
+        /* Tetrads keeps the group in its old places but takes the channels
+           under Type/Setting: they size and colour the marks that seg
+           chooses, and go dark with them when it chooses None. */
+        if (mode === 'tetrads') $('tetrad-type-fieldset').appendChild(channelFieldset);
     };
 
     seg('mode-seg', (v) => { switchMode(v); placeLatticeGroup(v); updateChannelVisibility(); });
@@ -580,7 +590,7 @@ export function setupUIEventListeners() {
 
     /* ---------------- Display ---------------- */
     const layoutDisplay = $('layoutDisplay');
-    seg('layout-seg', (v) => { layoutDisplay.value = v; scheduleApply('set'); });
+    seg('layout-seg', (v) => { layoutDisplay.value = v; updateChannelVisibility(); scheduleApply('set'); });
 
     /**
      * A shared display control has moved.
@@ -776,6 +786,30 @@ export function setupUIEventListeners() {
     for (const id of ['baseSize', 'scalingFactor']) {
         $(id).addEventListener('input', () => restyle({ rebuild: true }));
     }
+
+    /* ---------------- the halftone ----------------
+     * One state for the three modes, like the colormap it stands in for.
+     * Switching the screen on or off is a layout change and goes the way a
+     * layout change goes — a repaint in Triads and Dyads, a regeneration of
+     * the sprites in Tetrads. The SIZE is cheaper: a re-lay of the marks on
+     * the canvases and a uniform on the surfaces, so the slider stays live. */
+    const halftoneParams = $('halftone-params');
+    const applyHalftone = ({ sizeOnly = false } = {}) => {
+        halftoneParams.hidden = !halftoneOn();
+        mapsEl.classList.toggle('screened', halftoneOn());
+        if (appMode === 'tetrads') {
+            if (sizeOnly) applyTetradStyle();
+            else setLayoutMode(currentLayoutMode);
+        } else {
+            restyle({ rebuild: true });
+        }
+    };
+    seg('halftone-seg', (v) => { halftone.method = v; applyHalftone(); });
+    press('halftoneSize', 'halftone-size-v',
+        (v) => { halftone.size = v; applyHalftone({ sizeOnly: true }); },
+        (v) => `${v} px`);
+    halftoneParams.hidden = !halftoneOn();
+    mapsEl.classList.toggle('screened', halftoneOn());
 
     /* ---------------------------------------------------------------------
      *  Triads
@@ -1036,12 +1070,22 @@ export function setupUIEventListeners() {
     const tetradFieldFieldset = $('tetrad-field-fieldset');
     const theParamsEl = $('the-params');
     const tetradResRow = $('tetrad-res-row'), tetradResInput = $('tetradResolution');
+    /* `hidden` rather than an inline display, so the `data-mode` class that
+       takes the Field fieldset away in the other two modes is never fighting
+       a style attribute. */
     const showTetradModelParams = (model) => {
         const on = model === 'he';
-        theParamsEl.style.display = on ? 'block' : 'none';
-        tetradResRow.style.display = on ? 'flex' : 'none';
-        tetradResInput.style.display = on ? 'block' : 'none';
-        tetradFieldFieldset.style.display = on ? 'block' : 'none';
+        theParamsEl.hidden = !on;
+        tetradResRow.hidden = !on;
+        tetradResInput.hidden = !on;
+        tetradFieldFieldset.hidden = !on;
+    };
+    /* The cut's settings show with the cut and the body's with the body: a
+       slider for where a cut is, with no cut, is a control over nothing. */
+    const showFieldParams = () => {
+        const lit = (v) => $('tetrad-show-seg').querySelector(`button[data-v="${v}"]`).classList.contains('on');
+        $('tetrad-cut-params').hidden = !lit('tetradSlice');
+        $('tetrad-body-params').hidden = !lit('tetradVolume');
     };
     seg('tetrad-model-seg', (v) => {
         setTetradModel(v);
@@ -1069,9 +1113,10 @@ export function setupUIEventListeners() {
      * once: the cut is three vertices and the body's two numbers are
      * uniforms, and neither needs the field recomputed. */
     flagSeg('tetrad-show-seg', {
-        tetradSlice: (on) => { setTetradSlice(on); applySlice(); },
-        tetradVolume: (on) => { setTetradVolume(on); applySlice(); },
+        tetradSlice: (on) => { setTetradSlice(on); applySlice(); showFieldParams(); },
+        tetradVolume: (on) => { setTetradVolume(on); applySlice(); showFieldParams(); },
     });
+    showFieldParams();
     const showTetradPosition = press('tetradPosition', 'tetrad-pos-v',
         (v) => { setTetradPosition(v / 1000); applySlice(); },
         (v) => `${Math.round((v / 1000) * E())} ¢`);
@@ -1458,14 +1503,18 @@ export function setupUIEventListeners() {
         title: 'Tetrads',
         view: () => 'tetra',
         resize: onWindowResize,
-        leave: () => { layoutOnLeaving = currentLayoutMode; leaveTetrads(); },
+        /* The SIGNATURE rather than the index: the theme, the constant's
+           colour and the halftone all change what the sprites are baked in
+           without moving the index, and any of them can be changed from the
+           other two modes. */
+        leave: () => { layoutOnLeaving = layoutSignature(currentLayoutMode); leaveTetrads(); },
         enter: async () => {
             if (!tetradsBuilt) {
                 tetradsBuilt = true;
                 showStatus('working…', true);
                 await letStatusPaint();
                 await applyTetrads(true);
-            } else if (layoutOnLeaving !== null && layoutOnLeaving !== currentLayoutMode) {
+            } else if (layoutOnLeaving !== null && layoutOnLeaving !== layoutSignature(currentLayoutMode)) {
                 await setLayoutMode(currentLayoutMode);
             }
             layoutOnLeaving = null;

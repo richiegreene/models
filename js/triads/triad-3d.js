@@ -47,6 +47,33 @@ import { currentLayoutMode } from '../globals.js';
 import { colormapFn, colormap, colormapMaterial, onLight, groundColor, contourSegments } from './triad-2d.js';
 import { lighting, layoutSignature } from '../calculations/color-mapping.js';
 import { rotationSpeed, autoRotate, autoRotateDir, keyState } from '../globals.js';
+import {
+    halftoneOn, HALFTONE_GLSL, halftoneUniforms, syncHalftoneUniforms, groundHex, inkHex,
+} from '../calculations/halftone.js';
+
+/* ---- the surface in one ink ----
+   The screen is laid in SCREEN space — gl_FragCoord — so the dots are the
+   size the panel says wherever the surface is and however it is turned,
+   exactly as they are on the flat pane; the value comes up from the vertices.
+   No light: a screened surface is read by its silhouette and its contours,
+   the way an engraving is. */
+const HALFTONE_VERT = /* glsl */`
+attribute float value;
+varying float vValue;
+void main() {
+    vValue = value;
+    gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+}`;
+const HALFTONE_FRAG = HALFTONE_GLSL + /* glsl */`
+uniform int uHtMethod;
+uniform float uHtCell;
+uniform vec3 uHtInk;
+uniform vec3 uHtGround;
+varying float vValue;
+void main() {
+    float c = halftoneCoverage(gl_FragCoord.xy, vValue, uHtCell, uHtMethod);
+    gl_FragColor = vec4(mix(uHtGround, uHtInk, c), 1.0);
+}`;
 
 /** The triangle is drawn one unit on a side, centred on the origin. */
 const SIDE = 3.0;
@@ -706,10 +733,12 @@ function buildSurface(field) {
     const { w, h } = field;
     const positions = [];
     const colors = [];
+    const values = [];
     const index = new Int32Array(w * h).fill(-1);
     const map = colormapFn();
     const material = colormapMaterial();
     const flat = !triadFill;
+    const screened = halftoneOn();
 
     let n = 0;
     for (let y = 0; y < h; y++) {
@@ -725,6 +754,7 @@ function buildSurface(field) {
                 ? (onLight() ? { r: .88, g: .89, b: .92 } : { r: .16, g: .17, b: .21 })
                 : map(normalise(field, v));
             colors.push(c.r, c.g, c.b);
+            values.push(flat ? 0 : normalise(field, v));
             index[y * w + x] = n++;
         }
     }
@@ -777,6 +807,16 @@ function buildSurface(field) {
     geo.setIndex(tris);
     geo.computeVertexNormals();
 
+    if (screened) {
+        geo.setAttribute('value', new THREE.Float32BufferAttribute(values, 1));
+        return new THREE.Mesh(geo, new THREE.ShaderMaterial({
+            uniforms: halftoneUniforms(renderer.getPixelRatio()),
+            vertexShader: HALFTONE_VERT,
+            fragmentShader: HALFTONE_FRAG,
+            side: THREE.DoubleSide,
+        }));
+    }
+
     /* One Phong surface for both kinds, differing only in what it is given —
        see `lighting` in color-mapping.js. A material layout puts its body
        colour in and takes all its modelling from the light; a ramp layout
@@ -809,6 +849,11 @@ function buildPlate() {
     geo.computeVertexNormals();
     const material = colormapMaterial();
     const lit = lighting(colormap(), triadGloss);
+    /* Screened, the plate is the page itself: nothing under the lattice but
+       the ground, and nothing lit. */
+    if (halftoneOn()) {
+        return new THREE.Mesh(geo, new THREE.MeshBasicMaterial({ color: groundHex(), side: THREE.DoubleSide }));
+    }
     return new THREE.Mesh(geo, new THREE.MeshPhongMaterial({
         color: material ? material.color : (onLight() ? 0xf2f3f6 : 0x0b0c10),
         specular: lit.specular,
@@ -856,7 +901,8 @@ function buildContourLines(field) {
         vertexColors: true,
         linewidth: triadLineWidth,
         transparent: true,
-        opacity: (triadFill && !colormapMaterial()) ? 0.35 : 0.9,
+        /* Screened, the contours are in the ink and all of it. */
+        opacity: halftoneOn() ? 1 : (triadFill && !colormapMaterial()) ? 0.35 : 0.9,
     });
     mat.resolution.set(
         Math.max(1, host ? host.clientWidth : 1),
@@ -993,6 +1039,10 @@ export function draw(o) {
      * buys a control that keeps up with the hand moving it. */
     if (lines && lines.material.linewidth !== triadLineWidth) {
         lines.material.linewidth = triadLineWidth;
+    }
+    /* The screen's pitch, likewise a uniform rather than a rebuild. */
+    if (surface && surface.material.uniforms) {
+        syncHalftoneUniforms(surface.material, renderer.getPixelRatio());
     }
 
     if (cursor.live) {

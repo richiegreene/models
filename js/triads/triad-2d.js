@@ -20,7 +20,7 @@
 
 import {
     fitTriangle, centsToShape, shapeToCents, clampCents, equaveCents,
-    sampleField, normalise, SQRT3_2,
+    sampleField, normalise, insideTriangle, SQRT3_2,
 } from './triad-geometry.js';
 import {
     triadFill, triadLines, triadContours, triadLineWidth, triadDots, triadLabels,
@@ -29,6 +29,7 @@ import {
 import { currentTriads, currentField, complexityRange } from './triad-surface.js';
 import { currentLayoutMode } from '../globals.js';
 import { colormapAt, lighting, isLightGround, groundCss, layoutSignature } from '../calculations/color-mapping.js';
+import { halftone, halftoneOn, halftoneSignature, screenMarks, paintMarks, inkCss } from '../calculations/halftone.js';
 
 /** The colour layout the whole app is currently set to. */
 export function colormap() { return colormapAt(currentLayoutMode); }
@@ -62,6 +63,12 @@ let shadeKey = '';
 let contours = null;
 let contourKey = '';
 
+/* The halftone's marks, cached the same way: a screen over the triangle at
+   the pane's own size is some thousands of circles, read out of the field
+   through the same bilinear sample the cursor uses. */
+let marks = null;
+let marksKey = '';
+
 export function attach2D(el, gestureHandler) {
     canvas = el;
     ctx = canvas.getContext('2d');
@@ -71,7 +78,33 @@ export function attach2D(el, gestureHandler) {
 }
 
 /** Throw the cached paint away — a new field, a new colormap, a new level. */
-export function invalidate() { shadeKey = ''; contourKey = ''; }
+export function invalidate() { shadeKey = ''; contourKey = ''; marksKey = ''; }
+
+/**
+ * The screen over the field, as marks in pane pixels.
+ *
+ * Laid at the PANE's resolution rather than the field's: the shading is
+ * painted at the field's own size and scaled up, which is right for a
+ * continuous tone and wrong for a screen, whose whole point is dots of a
+ * stated size on the page. Every cell reads the field at its centre, through
+ * the same sample the cursor and the CSV read it with.
+ */
+export function buildMarks(field, fitted = fit) {
+    const key = `${field.w}x${field.h}|${field.min}|${field.max}|${field.up}|${fitted.side}|${fitted.originX}|${fitted.originY}|${halftoneSignature()}|${halftone.size}`;
+    if (key === marksKey && marks && fitted === fit) return marks;
+    const [v0, v1, v2] = fitted.vertices();
+    const xs = [v0[0], v1[0], v2[0]], ys = [v0[1], v1[1], v2[1]];
+    const built = screenMarks(Math.min(...xs), Math.min(...ys), Math.max(...xs), Math.max(...ys), (px, py) => {
+        const [gx, gy] = fitted.toShape(px, py);
+        /* A little past the edge, so the cut is made by the triangle's own
+           antialiased path and not by a row of missing cells. */
+        if (!insideTriangle(gx, gy, 0.01)) return NaN;
+        const v = sampleField(field, gx, gy);
+        return v === v ? normalise(field, v) : NaN;
+    });
+    if (fitted === fit) { marks = built; marksKey = key; }
+    return built;
+}
 
 /* ---- the scratch layer the triangle is cut out of ----
    Kept between frames and only resized when the pane is, because allocating a
@@ -363,6 +396,7 @@ function labelSize(label) {
 }
 
 function triadColor(t, range, enableColor, scaling) {
+    if (halftoneOn()) return inkCss();
     if (!enableColor) return onLight() ? '#111' : '#fff';
     const span = range.hi - range.lo;
     const norm = span > 1e-12 ? (t.complexity - range.lo) / span : 0.5;
@@ -414,11 +448,17 @@ export function draw(o) {
     const g = layer || ctx;
     if (!layer) { ctx.save(); ctx.clip(path); }
 
-    if (field && triadFill) {
+    if (field && triadFill && halftoneOn()) {
+        /* The screen, in the ink: the one layout that is geometry rather
+           than a picture, and cut by the same path the picture would be. */
+        paintMarks(g, buildMarks(field));
+    } else if (field && triadFill) {
         const img = buildShade(field);
         g.imageSmoothingEnabled = true;
         g.drawImage(img, fit.originX, fit.originY - fit.side * SQRT3_2,
                     fit.side, fit.side * SQRT3_2);
+    } else if (halftoneOn()) {
+        /* No plate under a screened picture: the ground IS the page. */
     } else if (!(field && triadLines)) {
         /* A plain ground, dark or light with the layout, so the lattice keeps
            the contrast it was coloured for.
@@ -440,7 +480,11 @@ export function draw(o) {
         g.lineWidth = triadLineWidth;
         for (let i = 0; i < segs.length; i += 5) {
             const c = map(segs[i + 4]);
-            g.strokeStyle = triadFill
+            /* In the ink, and all of it, when the picture is a screen: a
+               thirty-percent line on a page of one ink is a grey the page
+               has otherwise nowhere. */
+            g.strokeStyle = halftoneOn() ? inkCss()
+                : triadFill
                 ? `rgba(${light ? '0,0,0' : '255,255,255'},0.30)`
                 : `rgb(${Math.round(c.r * 255)},${Math.round(c.g * 255)},${Math.round(c.b * 255)})`;
             const p0 = fit.toPx(segs[i], segs[i + 1]);
@@ -464,11 +508,9 @@ export function draw(o) {
         ctx.restore();
     }
 
-    /* The outline last of the ground marks, so the shading cannot bleed past
-       it and the triangle always reads as a closed shape. */
-    ctx.strokeStyle = light ? 'rgba(0,0,0,.45)' : 'rgba(255,255,255,.35)';
-    ctx.lineWidth = 1;
-    ctx.stroke(path);
+    /* No outline. The shading is clipped to the path, so the triangle reads
+       as a shape by its own edge — a stroke around it was a frame around a
+       picture that already had one. */
 
     drawLattice(o);
     drawCursor(o);
@@ -520,7 +562,7 @@ function drawCursor(o) {
     const E = equaveCents(o.equaveRatio);
     const { gx, gy } = centsToShape(cursor.c1, cursor.c2, E);
     const [x, y] = fit.toPx(gx, gy);
-    const ink = onLight() ? '#111' : '#fff';
+    const ink = halftoneOn() ? inkCss() : onLight() ? '#111' : '#fff';
 
     ctx.strokeStyle = ink;
     ctx.lineWidth = 1.4;

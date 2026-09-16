@@ -3,6 +3,11 @@
    nothing in it touches a scene — and keeping it that way means the colour
    model can be tested on its own, without a browser or a GPU. */
 
+/* The halftone is the one layout that is not a colour at all, and it reads
+   this module's theme; the two import each other, and neither touches the
+   other's bindings until it is called. */
+import { halftoneOn, halftoneSignature, inkHex, groundHex } from './halftone.js';
+
 /* =====================================================================
  *  THE COLOUR LAYOUTS
  * =====================================================================
@@ -417,10 +422,30 @@ export function colormaps() {
 /** How many there are. Used by the cycling shortcut and the mode arithmetic. */
 export const COLORMAP_COUNT = RAMPS.length + 1;
 
-/** The layout currently counted by `currentLayoutMode`. */
+/**
+ * The layout currently counted by `currentLayoutMode`.
+ *
+ * WITH THE HALFTONE ON, THIS IS WHERE IT TAKES OVER.  The renderers ask this
+ * for their ground and their ramp, so the override lives here rather than in
+ * each of them: the ground becomes the theme's pure black or white, and the
+ * ramp becomes the ink at every value — a safety net for anything that still
+ * colours by value, so that nothing in a screened picture can come out in a
+ * colour. The chips are painted from colormaps() itself and keep showing the
+ * layouts as they are; see paintChips.
+ */
 export function colormapAt(index) {
     const all = colormaps();
-    return all[((index % all.length) + all.length) % all.length];
+    const map = all[((index % all.length) + all.length) % all.length];
+    if (!halftoneOn()) return map;
+    const ink = rgb(inkHex());
+    return {
+        ...map,
+        ground: groundHex(),
+        ramp: () => ink,
+        constant: false,
+        material: null,
+        halftone: true,
+    };
 }
 
 /**
@@ -434,7 +459,7 @@ export function colormapAt(index) {
  */
 export function layoutSignature(index) {
     const m = colormapAt(index);
-    return `${index}|${m.ground}|${m.material ? m.material.color : 'ramp'}`;
+    return `${index}|${m.ground}|${m.material ? m.material.color : 'ramp'}|${halftoneSignature()}`;
 }
 
 /**

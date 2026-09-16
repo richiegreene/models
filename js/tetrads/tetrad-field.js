@@ -49,6 +49,7 @@ import {
     scene, camera, renderer, controls, isClickPlayModeActive, currentLayoutMode,
 } from '../globals.js';
 import { colormapAt, isLightGround } from '../calculations/color-mapping.js';
+import { HALFTONE_GLSL, halftoneUniforms, syncHalftoneUniforms } from '../calculations/halftone.js';
 import {
     FRAME, baryToLocal, localToBary, clampBary, centsToBary, baryToCents,
     sliceTriangle, slicePlane, equaveCents, normaliseVolume, sampleVolume,
@@ -60,10 +61,9 @@ import {
 import { currentVolume } from './tetrad-volume.js';
 
 let group = null;
-let edges = null;
+let edges = null;       // the shape's own edges, for a cut shown on its own
 let body = null;        // the ray-marched volume
 let cut = null;         // the section
-let cutEdge = null;     // its outline
 let marker = null;      // the cursor bead
 let volTex = null;
 let lutTex = null;
@@ -106,8 +106,13 @@ uniform sampler2D uLut;
 uniform mat3 uToBary;
 uniform vec3 uApex;
 uniform float uR;
+uniform int uHtMethod;
+uniform float uHtCell;
+uniform vec3 uHtInk;
+uniform vec3 uHtGround;
 in vec3 vLocal;
 out vec4 outColor;
+` + HALFTONE_GLSL + /* glsl */`
 
 vec3 toBary(vec3 p) { return uToBary * (p - uApex); }
 float entropyAt(vec3 b) {
@@ -119,8 +124,15 @@ vec3 shade(float conc) { return texture(uLut, vec2(clamp(conc, 0.0, 1.0), 0.5)).
 
 const CUT_FRAG = COMMON + /* glsl */`
 void main() {
-    float h = entropyAt(toBary(vLocal));
-    outColor = vec4(shade(1.0 - h), 1.0);
+    float conc = 1.0 - entropyAt(toBary(vLocal));
+    /* Screened: the section is a page, and the tone is a screen of the
+       concordance laid in screen space, like the flat pane's. */
+    if (uHtMethod > 0) {
+        float c = halftoneCoverage(gl_FragCoord.xy, conc, uHtCell, uHtMethod);
+        outColor = vec4(mix(uHtGround, uHtInk, c), 1.0);
+        return;
+    }
+    outColor = vec4(shade(conc), 1.0);
 }`;
 
 const BODY_FRAG = COMMON + /* glsl */`
@@ -175,6 +187,16 @@ void main() {
         alpha += (1.0 - alpha) * a;
         if (alpha > 0.985) break;
     }
+    /* Screened: what the ray accumulated is a TONE, and the tone is put on
+       the page as a screen — a dot sized by the body's opacity along that
+       ray, in the ink, over whatever is behind. Squared first: a body dense
+       enough to read in colour is a solid in one ink, and the square keeps
+       the haze a light stipple while the wells stay full. */
+    if (uHtMethod > 0) {
+        float c = halftoneCoverage(gl_FragCoord.xy, alpha * alpha, uHtCell, uHtMethod);
+        outColor = vec4(uHtInk * c, c);
+        return;
+    }
     outColor = vec4(acc, alpha);
 }`;
 
@@ -226,6 +248,7 @@ export function attachField(gestureHandler, opts, sweepHandler) {
         uToBary: { value: FRAME.Minv },
         uApex: { value: FRAME.apex },
         uR: { value: 1 },
+        ...halftoneUniforms(renderer.getPixelRatio()),
     });
 
     /* ---- the body ---- */
@@ -287,17 +310,11 @@ export function attachField(gestureHandler, opts, sweepHandler) {
     cut.visible = false;
     group.add(cut);
 
-    const edgeGeo = new THREE.BufferGeometry();
-    edgeGeo.setAttribute('position', new THREE.Float32BufferAttribute(new Float32Array(9), 3));
-    cutEdge = new THREE.LineLoop(edgeGeo, new THREE.LineBasicMaterial({
-        color: 0xffffff, transparent: true, opacity: 0.55,
-    }));
-    cutEdge.renderOrder = 2;
-    cutEdge.frustumCulled = false;
-    cutEdge.visible = false;
-    group.add(cutEdge);
-
-    /* ---- the outline of the shape, so the body has a frame to hang in ---- */
+    /* ---- the edges of the shape ----
+       Only while the cut is shown on its own: a section floating with nothing
+       around it needs the shape it was cut from to be read against, and the
+       body, when it is up, IS that shape. The cut itself has no outline — it
+       reads as a shape by its own colour. */
     const hullGeo = new THREE.BufferGeometry();
     hullGeo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
     edges = new THREE.LineSegments(new THREE.EdgesGeometry(hullGeo), new THREE.LineBasicMaterial({
@@ -396,8 +413,9 @@ export function restyleField() {
     lutTex.needsUpdate = true;
     const light = isLightGround(map.ground);
     edges.material.color.set(light ? 0x000000 : 0xffffff);
-    cutEdge.material.color.set(light ? 0x111111 : 0xffffff);
     marker.material.color.set(light ? 0x111111 : 0xffffff);
+    /* The screen, if one is on: its method, its pitch, its ink and ground. */
+    for (const m of [body.material, cut.material]) syncHalftoneUniforms(m, renderer.getPixelRatio());
 }
 
 /** The body's own two numbers, straight to the shader. */
@@ -416,13 +434,11 @@ export function updateSlice() {
     if (!group) return;
     const tri = sliceTriangle(tetradAxis, tetradPosition);
     const p = tri.map((b) => baryToLocal(b.u, b.v, b.w));
-    for (const obj of [cut, cutEdge]) {
-        const a = obj.geometry.attributes.position;
-        for (let i = 0; i < 3; i++) a.setXYZ(i, p[i].x, p[i].y, p[i].z);
-        a.needsUpdate = true;
-        obj.geometry.computeBoundingSphere();
-        obj.geometry.computeBoundingBox();
-    }
+    const a = cut.geometry.attributes.position;
+    for (let i = 0; i < 3; i++) a.setXYZ(i, p[i].x, p[i].y, p[i].z);
+    a.needsUpdate = true;
+    cut.geometry.computeBoundingSphere();
+    cut.geometry.computeBoundingBox();
     const plane = slicePlane(tetradAxis, tetradPosition);
     body.material.uniforms.uCut.value.set(plane.n[0], plane.n[1], plane.n[2], plane.d);
     syncVisibility();
@@ -433,9 +449,8 @@ export function syncVisibility() {
     const showCut = ready && tetradSlice;
     const showBody = ready && tetradVolume;
     cut.visible = showCut;
-    cutEdge.visible = showCut;
     body.visible = showBody;
-    edges.visible = ready;
+    edges.visible = showCut && !showBody;
     body.material.uniforms.uCutOn.value = showCut ? 1 : 0;
     if (!ready) marker.visible = false;
 }

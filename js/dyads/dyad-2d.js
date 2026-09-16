@@ -32,6 +32,7 @@ import {
 import { currentDyads, currentCurve, complexityRange, modelName } from './dyad-curve.js';
 import { currentLayoutMode } from '../globals.js';
 import { colormapAt, isLightGround, groundCss } from '../calculations/color-mapping.js';
+import { halftoneOn, screenMarks, paintMarks, inkCss } from '../calculations/halftone.js';
 
 /** The colour layout the whole app is currently set to. */
 export function colormap() { return colormapAt(currentLayoutMode); }
@@ -330,14 +331,24 @@ function drawCurve(o, C, axis) {
         area.closePath();
         ctx.save();
         ctx.clip(area);
-        /* Column by column through the ramp. A gradient object would be
-           tidier and would also be a lie: the ramp is not linear in the value,
-           so its stops would have to be sampled anyway. */
-        for (let i = 0; i < cols; i++) {
-            const v = Math.min(1, Math.max(0, vs[i]));
-            const c = map(v === v ? v : 0);
-            ctx.fillStyle = rgbOf(c);
-            ctx.fillRect(x0 + i, y1, 1.02, y0 - y1);
+        if (halftoneOn()) {
+            /* The screen under the curve, each cell inked by the value at its
+               column — the same reading the ramp would have given it. */
+            paintMarks(ctx, screenMarks(x0, y1, x1, y0, (px) => {
+                const i = Math.round(px - x0);
+                if (i < 0 || i >= cols) return NaN;
+                return vs[i];
+            }));
+        } else {
+            /* Column by column through the ramp. A gradient object would be
+               tidier and would also be a lie: the ramp is not linear in the
+               value, so its stops would have to be sampled anyway. */
+            for (let i = 0; i < cols; i++) {
+                const v = Math.min(1, Math.max(0, vs[i]));
+                const c = map(v === v ? v : 0);
+                ctx.fillStyle = rgbOf(c);
+                ctx.fillRect(x0 + i, y1, 1.02, y0 - y1);
+            }
         }
         ctx.restore();
     }
@@ -350,7 +361,7 @@ function drawCurve(o, C, axis) {
            say what the height says. Over a fill the two agree by construction,
            so the stroke reads as the fill's own edge rather than as an outline
            drawn around it. */
-        ctx.strokeStyle = valueGradient(x0, x1, cols, vs, map);
+        ctx.strokeStyle = halftoneOn() ? inkCss() : valueGradient(x0, x1, cols, vs, map);
         ctx.lineWidth = dyadLineWidth;
         ctx.lineJoin = 'round';
         ctx.lineCap = 'round';
@@ -365,6 +376,7 @@ function labelSize(label) {
 }
 
 function dyadColor(d, range, enableColor, scaling) {
+    if (halftoneOn()) return inkCss();
     if (!enableColor) return onLight() ? '#111' : '#fff';
     const span = range.hi - range.lo;
     const norm = span > 1e-12 ? (d.complexity - range.lo) / span : 0.5;
@@ -428,7 +440,8 @@ function drawLattice(o, C, axis) {
                 r = base * (1 + (1 - norm) * (o.scalingFactor - 1));
             }
             ctx.strokeStyle = color;
-            ctx.globalAlpha = 0.5;
+            /* A stem at half strength is a grey, and a screened page has none. */
+            ctx.globalAlpha = halftoneOn() ? 1 : 0.5;
             ctx.lineWidth = 1;
             ctx.beginPath();
             ctx.moveTo(x, yFloor); ctx.lineTo(x, y);
