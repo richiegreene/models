@@ -697,7 +697,14 @@
                  screen's. It stands in for whichever ramp is chosen above,
                  in all three modes, and the exports come out as vectors: a
                  circle per dot, a path per hatch. Size is the pitch of the
-                 screen, in pixels. -->
+                 screen, in pixels.
+
+                 On the lifted surfaces the screen can be laid on the GLASS —
+                 fixed to the window, the surface seen through it — or on the
+                 SHAPE, where it turns and foreshortens with the relief and,
+                 in the tetrahedron's body, becomes a lattice of globes in
+                 the volume itself. The flat panes are their own surface, so
+                 the switch is Triads' and Tetrads' only. -->
             <div class="tune-h">Halftone</div>
             <div class="seg" id="halftone-seg">
               <button data-v="off" class="on"
@@ -710,12 +717,18 @@
                 title="Two hatches crossed, weighted so that together they cover exactly the value.">Cross</button>
             </div>
             <div id="halftone-params" hidden>
+              <div class="seg" id="halftone-lay-seg" data-mode="triads tetrads">
+                <button data-v="screen" class="on"
+                  title="The screen is laid on the glass: the dots stay the size and place the panel says however the surface is turned, and the surface shows through them.">Screen</button>
+                <button data-v="shape"
+                  title="The screen is laid on the shape itself: the dots sit on the surface and turn, tilt and foreshorten with it. In the tetrahedron's body they become globes in the volume, clustered where the chords are simplest.">Shape</button>
+              </div>
               <div class="pressrow">
                 <label for="halftoneSize">Size</label>
                 <span class="pressval" id="halftone-size-v">6 px</span>
               </div>
               <input type="range" id="halftoneSize" min="2" max="24" step="0.5" value="6"
-                title="The pitch of the screen — how far apart its cells are, in pixels. Fine is a tone; coarse is a texture you can count.">
+                title="The pitch of the screen — how far apart its cells are, in pixels. Fine is a tone; coarse is a texture you can count. Laid on the shape, that is its size at the view the pane opens on; zoom in and it grows.">
             </div>
 
             <!-- ---- how fast the shape turns ----

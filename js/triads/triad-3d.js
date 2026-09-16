@@ -52,26 +52,38 @@ import {
 } from '../calculations/halftone.js';
 
 /* ---- the surface in one ink ----
-   The screen is laid in SCREEN space — gl_FragCoord — so the dots are the
-   size the panel says wherever the surface is and however it is turned,
-   exactly as they are on the flat pane; the value comes up from the vertices.
-   No light: a screened surface is read by its silhouette and its contours,
-   the way an engraving is. */
+   Two lays of the one screen, chosen by a uniform — see halftone.js. On the
+   GLASS the lattice is laid in screen space, gl_FragCoord, so the dots are
+   the size the panel says wherever the surface is and however it is turned,
+   exactly as they are on the flat pane. On the SHAPE it is laid over the
+   surface's plan — the scene's x and z, which are the two intervals scaled —
+   and lifted onto the relief with it, so it is the flat pane's own screen
+   seen in perspective: square from above, foreshortened on the slopes, and
+   turning with the surface rather than showing through it. The value comes
+   up from the vertices either way. No light: a screened surface is read by
+   its silhouette and its contours, the way an engraving is. */
 const HALFTONE_VERT = /* glsl */`
 attribute float value;
 varying float vValue;
+varying vec2 vPlan;
 void main() {
     vValue = value;
+    vPlan = position.xz;
     gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
 }`;
 const HALFTONE_FRAG = HALFTONE_GLSL + /* glsl */`
 uniform int uHtMethod;
+uniform int uHtShape;
 uniform float uHtCell;
+uniform float uHtCellWorld;
 uniform vec3 uHtInk;
 uniform vec3 uHtGround;
 varying float vValue;
+varying vec2 vPlan;
 void main() {
-    float c = halftoneCoverage(gl_FragCoord.xy, vValue, uHtCell, uHtMethod);
+    float c = uHtShape == 1
+        ? halftoneSurface(vPlan, vValue, uHtCellWorld, uHtMethod)
+        : halftoneCoverage(gl_FragCoord.xy, vValue, uHtCell, uHtMethod);
     gl_FragColor = vec4(mix(uHtGround, uHtInk, c), 1.0);
 }`;
 
@@ -540,6 +552,23 @@ function solveFrame(margin = FIT_MARGIN) {
  */
 let lastIdeal = null;
 
+/**
+ * What one CSS pixel is worth in the scene, at the framing the pane opens on
+ * — the scale the shape-laid screen is pitched by, so that "6 px" means six
+ * pixels at the fitted view and the dots then grow and shrink with the
+ * zoom rather than re-laying themselves under it. Read from the last plain
+ * fit rather than the live camera for exactly that reason; before there has
+ * been one, from wherever the camera is.
+ */
+function worldPerPx() {
+    if (!camera || !host) return 0.01;
+    const h = Math.max(1, host.clientHeight);
+    const dist = lastIdeal ? lastIdeal.distance
+        : (controls ? camera.position.distanceTo(controls.target) : camera.position.length());
+    const tanV = Math.tan((camera.fov * Math.PI) / 360);
+    return (2 * dist * tanV) / h;
+}
+
 function applyFrame(f) {
     controls.target.copy(f.target);
     camera.position.copy(f.target).addScaledVector(f.dir, f.distance);
@@ -551,7 +580,10 @@ function frameCamera(margin = FIT_MARGIN) {
     const f = solveFrame(margin);
     if (!f) return;
     applyFrame(f);
-    lastIdeal = { target: f.target.clone(), distance: f.distance };
+    /* Only a plain fit is a framing the pane measures itself against: the
+       export's tight crop (see frameTight) is a one-off, and neither a later
+       resize nor the shape-laid screen's pitch should be taken from it. */
+    if (margin === FIT_MARGIN) lastIdeal = { target: f.target.clone(), distance: f.distance };
 }
 
 /**
@@ -810,10 +842,13 @@ function buildSurface(field) {
     if (screened) {
         geo.setAttribute('value', new THREE.Float32BufferAttribute(values, 1));
         return new THREE.Mesh(geo, new THREE.ShaderMaterial({
-            uniforms: halftoneUniforms(renderer.getPixelRatio()),
+            uniforms: halftoneUniforms(renderer.getPixelRatio(), worldPerPx()),
             vertexShader: HALFTONE_VERT,
             fragmentShader: HALFTONE_FRAG,
             side: THREE.DoubleSide,
+            /* The shape lay softens its edges with fwidth, which on a WebGL1
+               context is an extension three has to be asked to turn on. */
+            extensions: { derivatives: true },
         }));
     }
 
@@ -1046,9 +1081,9 @@ export function draw(o) {
     if (lines && lines.material.linewidth !== triadLineWidth) {
         lines.material.linewidth = triadLineWidth;
     }
-    /* The screen's pitch, likewise a uniform rather than a rebuild. */
+    /* The screen's pitch and its lay, likewise uniforms rather than a rebuild. */
     if (surface && surface.material.uniforms) {
-        syncHalftoneUniforms(surface.material, renderer.getPixelRatio());
+        syncHalftoneUniforms(surface.material, renderer.getPixelRatio(), worldPerPx());
     }
 
     if (cursor.live) {

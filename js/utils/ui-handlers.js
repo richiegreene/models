@@ -795,8 +795,9 @@ export function setupUIEventListeners() {
      * One state for the three modes, like the colormap it stands in for.
      * Switching the screen on or off is a layout change and goes the way a
      * layout change goes — a repaint in Triads and Dyads, a regeneration of
-     * the sprites in Tetrads. The SIZE is cheaper: a re-lay of the marks on
-     * the canvases and a uniform on the surfaces, so the slider stays live. */
+     * the sprites in Tetrads. The SIZE and the LAY are cheaper: a re-lay of
+     * the marks on the canvases and a uniform on the surfaces, so the slider
+     * stays live and the switch is instant. */
     const halftoneParams = $('halftone-params');
     const applyHalftone = ({ sizeOnly = false } = {}) => {
         halftoneParams.hidden = !halftoneOn();
@@ -809,6 +810,7 @@ export function setupUIEventListeners() {
         }
     };
     seg('halftone-seg', (v) => { halftone.method = v; applyHalftone(); });
+    seg('halftone-lay-seg', (v) => { halftone.shape = v === 'shape'; applyHalftone({ sizeOnly: true }); });
     press('halftoneSize', 'halftone-size-v',
         (v) => { halftone.size = v; applyHalftone({ sizeOnly: true }); },
         (v) => `${v} px`);

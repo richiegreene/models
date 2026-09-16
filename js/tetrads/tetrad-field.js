@@ -49,7 +49,9 @@ import {
     scene, camera, renderer, controls, isClickPlayModeActive, currentLayoutMode,
 } from '../globals.js';
 import { colormapAt, isLightGround } from '../calculations/color-mapping.js';
-import { HALFTONE_GLSL, halftoneUniforms, syncHalftoneUniforms } from '../calculations/halftone.js';
+import {
+    HALFTONE_GLSL, HALFTONE_VOLUME_GLSL, halftoneUniforms, syncHalftoneUniforms, cellWorld,
+} from '../calculations/halftone.js';
 import {
     FRAME, baryToLocal, localToBary, clampBary, centsToBary, baryToCents,
     sliceTriangle, slicePlane, equaveCents, normaliseVolume, sampleVolume,
@@ -72,6 +74,7 @@ let getOpts = null;     // () => { equaveRatio, tetrads }
 let onSweep = null;
 let dragging = false;
 let ready = false;      // a field is loaded on the GPU
+let homeDistance = 6;   // how far the camera stands from the shape when the app opens
 
 /** How many steps a ray takes through the body. */
 const STEPS = 160;
@@ -107,7 +110,9 @@ uniform mat3 uToBary;
 uniform vec3 uApex;
 uniform float uR;
 uniform int uHtMethod;
+uniform int uHtShape;
 uniform float uHtCell;
+uniform float uHtCellWorld;
 uniform vec3 uHtInk;
 uniform vec3 uHtGround;
 in vec3 vLocal;
@@ -123,12 +128,23 @@ vec3 shade(float conc) { return texture(uLut, vec2(clamp(conc, 0.0, 1.0), 0.5)).
 `;
 
 const CUT_FRAG = COMMON + /* glsl */`
+uniform vec3 uCutU;
+uniform vec3 uCutV;
 void main() {
     float conc = 1.0 - entropyAt(toBary(vLocal));
     /* Screened: the section is a page, and the tone is a screen of the
-       concordance laid in screen space, like the flat pane's. */
+       concordance — laid on the glass, like the flat pane's, or laid in the
+       section's own plane, where it is fixed to the shape: uCutU and uCutV
+       span the plane, so the lattice stays put while the cut sweeps through
+       it and only the marks change size. */
     if (uHtMethod > 0) {
-        float c = halftoneCoverage(gl_FragCoord.xy, conc, uHtCell, uHtMethod);
+        float c;
+        if (uHtShape == 1) {
+            vec2 s = vec2(dot(vLocal, uCutU), dot(vLocal, uCutV));
+            c = halftoneSurface(s, conc, uHtCellWorld, uHtMethod);
+        } else {
+            c = halftoneCoverage(gl_FragCoord.xy, conc, uHtCell, uHtMethod);
+        }
         outColor = vec4(mix(uHtGround, uHtInk, c), 1.0);
         return;
     }
@@ -143,6 +159,24 @@ uniform int uSteps;
 uniform vec4 uCut;
 uniform float uCutOn;
 uniform float uScale;
+uniform float uHtPxWorld;
+` + HALFTONE_VOLUME_GLSL + /* glsl */`
+
+/* What a lattice point of the shape-laid screen is worth: the concordance
+   through the same Focus the ray march uses, so a well stands out of the
+   cluster as sharply as it stands out of the haze, and Density as a gain on
+   it, so the slider still says how much ink the body carries. Squared, for
+   the reason the glass-laid body squares its tone: a ray crosses some forty
+   cells, and forty small globes in a row sum to a haze that no one of them
+   is — the square puts the haze below a pixel, where htVisible lets it go,
+   and leaves the wells their full size with a halo of smaller globes around
+   each. Nothing outside the simplex — the texture's padding is not a chord. */
+float htValueAt(vec3 p) {
+    vec3 b = toBary(p);
+    if (any(lessThan(b, vec3(0.0))) || b.x + b.y + b.z > 1.0) return 0.0;
+    float g = pow(1.0 - entropyAt(b), uFocus) * uDensity * 2.0;
+    return g * g;
+}
 
 void main() {
     /* Back faces are drawn, so vLocal is where the ray LEAVES the shape and
@@ -174,6 +208,17 @@ void main() {
         }
     }
     if (tmax <= tmin) discard;
+
+    /* Screened on the shape: no haze at all. The body is a lattice of globes
+       (or rods) hanging in the volume, each sized by the concordance at its
+       own point, and the ray is walked through them cell by cell — see
+       halftoneVolume. A well is then a cluster: packed solid where the
+       chord is simplest, thinning to a sprinkle of small stars around it. */
+    if (uHtMethod > 0 && uHtShape == 1) {
+        float c = halftoneVolume(uCam, dir, tmin, tmax, uHtCellWorld, uHtMethod, uHtPxWorld);
+        outColor = vec4(uHtInk * c, c);
+        return;
+    }
 
     float dt = (tmax - tmin) / float(uSteps);
     vec3 acc = vec3(0.0);
@@ -242,13 +287,19 @@ export function attachField(gestureHandler, opts, sweepHandler) {
     lutTex.wrapS = THREE.ClampToEdgeWrapping;
     lutTex.needsUpdate = true;
 
+    /* The shape-laid screen is pitched by what a pixel is worth at the
+       shape's centre from where the camera opens, so "6 px" means six
+       pixels at that view and the marks then grow with the zoom instead of
+       re-laying themselves under it. Recorded now, before anyone has moved. */
+    homeDistance = camera.position.length();
+
     const shared = () => ({
         uVol: { value: volTex },
         uLut: { value: lutTex },
         uToBary: { value: FRAME.Minv },
         uApex: { value: FRAME.apex },
         uR: { value: 1 },
-        ...halftoneUniforms(renderer.getPixelRatio()),
+        ...halftoneUniforms(renderer.getPixelRatio(), worldPerPx()),
     });
 
     /* ---- the body ---- */
@@ -276,6 +327,7 @@ export function attachField(gestureHandler, opts, sweepHandler) {
             uCut: { value: new THREE.Vector4(1, 1, 1, -0.5) },
             uCutOn: { value: 0 },
             uScale: { value: OPACITY_SCALE },
+            uHtPxWorld: { value: pxWorld() },
         },
         vertexShader: VERT,
         fragmentShader: BODY_FRAG,
@@ -300,7 +352,11 @@ export function attachField(gestureHandler, opts, sweepHandler) {
     cutGeo.setAttribute('position', new THREE.Float32BufferAttribute(new Float32Array(9), 3));
     cut = new THREE.Mesh(cutGeo, new THREE.ShaderMaterial({
         glslVersion: THREE.GLSL3,
-        uniforms: shared(),
+        uniforms: {
+            ...shared(),
+            uCutU: { value: new THREE.Vector3(1, 0, 0) },
+            uCutV: { value: new THREE.Vector3(0, 1, 0) },
+        },
         vertexShader: VERT,
         fragmentShader: CUT_FRAG,
         side: THREE.DoubleSide,
@@ -339,6 +395,22 @@ export function attachField(gestureHandler, opts, sweepHandler) {
 /** Whether the card can draw this at all. */
 export function fieldSupported() {
     return !!(renderer && renderer.capabilities && renderer.capabilities.isWebGL2);
+}
+
+/** Scene units per CSS pixel at the shape's centre, from where the camera opens. */
+function worldPerPx() {
+    const h = Math.max(1, renderer.domElement.clientHeight || 1);
+    const tanV = Math.tan((camera.fov * Math.PI) / 360);
+    return (2 * homeDistance * tanV) / h;
+}
+
+/** Scene units per DEVICE pixel at unit distance — what the volume screen
+ *  softens its edges over, scaled by each mark's own depth. */
+const bufferSize = new THREE.Vector2();
+function pxWorld() {
+    renderer.getDrawingBufferSize(bufferSize);
+    const tanV = Math.tan((camera.fov * Math.PI) / 360);
+    return (2 * tanV) / Math.max(1, bufferSize.y);
 }
 
 /* ---------------------------------------------------------------------
@@ -414,8 +486,11 @@ export function restyleField() {
     const light = isLightGround(map.ground);
     edges.material.color.set(light ? 0x000000 : 0xffffff);
     marker.material.color.set(light ? 0x111111 : 0xffffff);
-    /* The screen, if one is on: its method, its pitch, its ink and ground. */
-    for (const m of [body.material, cut.material]) syncHalftoneUniforms(m, renderer.getPixelRatio());
+    /* The screen, if one is on: its method, its lay, its pitch, its ink and
+       ground. */
+    for (const m of [body.material, cut.material]) {
+        syncHalftoneUniforms(m, renderer.getPixelRatio(), worldPerPx());
+    }
 }
 
 /** The body's own two numbers, straight to the shader. */
@@ -441,6 +516,15 @@ export function updateSlice() {
     cut.geometry.computeBoundingBox();
     const plane = slicePlane(tetradAxis, tetradPosition);
     body.material.uniforms.uCut.value.set(plane.n[0], plane.n[1], plane.n[2], plane.d);
+    /* The section's own two axes, for the screen laid in its plane. Taken
+       from the mid-section rather than this one, which at either end of the
+       slider is a point: every cut along an axis is parallel, so the frame
+       is the same and the lattice is fixed to the shape as the cut sweeps. */
+    const mid = sliceTriangle(tetradAxis, 0.5).map((b) => baryToLocal(b.u, b.v, b.w));
+    const U = mid[1].clone().sub(mid[0]).normalize();
+    const N = new THREE.Vector3().crossVectors(U, mid[2].clone().sub(mid[0])).normalize();
+    cut.material.uniforms.uCutU.value.copy(U);
+    cut.material.uniforms.uCutV.value.crossVectors(N, U);
     syncVisibility();
 }
 
@@ -480,6 +564,14 @@ export function frameField() {
     camera.getWorldPosition(camWorld);
     group.worldToLocal(camWorld);
     body.material.uniforms.uCam.value.copy(camWorld);
+    /* The two pixel scales follow the pane's size, which nothing else here
+       is told about; a few multiplies a frame is cheaper than listening. */
+    if (body.material.uniforms.uHtShape.value) {
+        const cw = cellWorld(worldPerPx());
+        body.material.uniforms.uHtCellWorld.value = cw;
+        cut.material.uniforms.uHtCellWorld.value = cw;
+        body.material.uniforms.uHtPxWorld.value = pxWorld();
+    }
 
     if (tetradSweep && tetradSlice) {
         /* A full pass in about eight seconds, and back — slow enough to read
