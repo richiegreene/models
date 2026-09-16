@@ -114,7 +114,7 @@
           <button data-v="triads" class="on"
             title="Three voices in a triangle: the same limit read over two intervals, on a concordance surface you can play">Triads</button>
           <button data-v="tetrads"
-            title="Four voices in a tetrahedron: every JI tetrad under the limit, placed by its three intervals">Tetrads</button>
+            title="Four voices in a tetrahedron: every JI tetrad under the limit, placed by its three intervals — and, under them, harmonic entropy as a volume you can cut through and play">Tetrads</button>
         </div>
       </div>
 
@@ -175,26 +175,12 @@
                 title="Sethares' sensory dissonance, computed from the partials of the timbre currently in the Play drawer">Sethares</button>
             </div>
 
-            <div id="he-params">
-              <div class="pressrow">
-                <label for="heSpread">Spread</label>
-                <span class="pressval" id="he-spread-v">17 ¢</span>
-              </div>
-              <input type="range" id="heSpread" min="4" max="80" step="1" value="17"
-                title="How wide the ear's uncertainty about a ratio is taken to be. Narrow gives sharp isolated spikes; wide merges neighbours into broad regions of concordance.">
-              <div class="pressrow">
-                <label for="heNLimit">Series depth</label>
-                <span class="pressval" id="he-n-v">300</span>
-              </div>
-              <input type="range" id="heNLimit" min="40" max="400" step="10" value="300"
-                title="How far up the harmonic series the triads being weighed are drawn from. Lower is faster and coarser.">
-              <div class="pressrow">
-                <label for="heAlpha">Order</label>
-                <span class="pressval" id="he-alpha-v">7.0</span>
-              </div>
-              <input type="range" id="heAlpha" min="1.5" max="12" step="0.1" value="7"
-                title="The order of the Rényi entropy. Higher weights the single most likely reading more heavily.">
-            </div>
+            <!-- The entropy's five settings — spread s, order a, series, height
+                 N and kernel — are one block built by he-controls.js for all
+                 three modes, so the words, the ranges and the tooltips cannot
+                 drift apart between the line, the triangle and the volume.
+                 The numbers behind them are this mode's own: heParams. -->
+            <div id="he-params" class="he-params"></div>
 
             <div id="sm-params" class="mode-off">
               <div class="pressrow">
@@ -227,6 +213,34 @@
 
           </fieldset>
 
+          <!-- ---- what fills the tetrahedron ----
+               Tetrads only. The points have always been the whole picture;
+               this puts a field under them — the same harmonic entropy the
+               triangle draws, one interval more, as a volume. It is here rather
+               than in Display for the reason the triangle's Model is: it
+               decides what there is to look at. How the volume is cut and
+               shown is in Display, under Field. -->
+          <fieldset data-mode="tetrads" class="mode-off">
+            <legend>Model</legend>
+            <div class="seg" id="tetrad-model-seg">
+              <button data-v="blank" class="on"
+                title="No field: the just-intonation tetrads on their own">Blank</button>
+              <button data-v="he"
+                title="Harmonic entropy over the whole tetrahedron — how many simple readings of the sonority the ear has to choose between, at every point, in just intonation or not">Entropy</button>
+            </div>
+
+            <!-- Built by he-controls.js, over theParams. -->
+            <div id="the-params" class="he-params" style="display:none"></div>
+
+            <div class="pressrow" id="tetrad-res-row" style="display:none">
+              <label for="tetradResolution">Resolution</label>
+              <span class="pressval" id="tetrad-res-v">128³</span>
+            </div>
+            <input type="range" id="tetradResolution" min="48" max="160" step="8" value="128"
+              style="display:none"
+              title="Cells per axis of the volume the model is computed on. 128 is a cell of about nine cents over an octave, a few seconds to compute; the readout says the cell, and the foot says if it is too coarse for the order asked for.">
+          </fieldset>
+
           <!-- ---- what the curve IS ----
                Dyads only, and in this drawer for the same reason the triangle's
                Model is: it decides what there is to look at. A dyad has one
@@ -251,26 +265,9 @@
                 title="The Tenney norm made continuous: log2(pq) at every ratio with a parabola let down from each, so the space between ratios has a value too">Tenney</button>
             </div>
 
-            <div id="dhe-params">
-              <div class="pressrow">
-                <label for="dheSpread">Spread</label>
-                <span class="pressval" id="dhe-spread-v">17 ¢</span>
-              </div>
-              <input type="range" id="dheSpread" min="4" max="80" step="1" value="17"
-                title="How wide the ear's uncertainty about a ratio is taken to be. Narrow gives sharp isolated spikes; wide merges neighbours into broad regions of concordance.">
-              <div class="pressrow">
-                <label for="dheNLimit">Series depth</label>
-                <span class="pressval" id="dhe-n-v">160</span>
-              </div>
-              <input type="range" id="dheNLimit" min="20" max="400" step="10" value="160"
-                title="How far up the harmonic series the intervals being weighed are drawn from. Lower is faster and coarser.">
-              <div class="pressrow">
-                <label for="dheAlpha">Order</label>
-                <span class="pressval" id="dhe-alpha-v">7.0</span>
-              </div>
-              <input type="range" id="dheAlpha" min="1.5" max="12" step="0.1" value="7"
-                title="The order of the Rényi entropy. Higher weights the single most likely reading more heavily.">
-            </div>
+            <!-- Built by he-controls.js — the same five settings the triangle
+                 and the tetrahedron have, over dheParams. -->
+            <div id="dhe-params" class="he-params"></div>
 
             <div id="dsm-params" class="mode-off">
               <div class="pressrow">
@@ -492,8 +489,74 @@
             <div class="seg" id="layout-seg">
               <button data-v="points" class="on" title="One point per tetrad">Points</button>
               <button data-v="labels" title="The enumerated ratio itself, in place of the point">Labels</button>
+              <button data-v="none" title="No marks at all — the field on its own. The set is still generated, so the CSV and the snap still know every tetrad.">None</button>
             </div>
             <input type="hidden" id="layoutDisplay" value="points">
+          </fieldset>
+
+          <!-- ---- the volume, cut and shown ----
+               Tetrads only, and only while a field is up. A volume cannot be
+               looked at the way a surface can — every point is behind some
+               other point — so there are two pictures of it and they are
+               independent switches, like the triangle's Fill and Lines: the
+               CUT is a plane through the field, opaque, coloured where it
+               cuts; the BODY is the whole field as a translucent solid. Both
+               together is the tomograph's own picture, a bright section
+               moving through a ghost.
+
+               The cut is always parallel to a face, which keeps it a triangle
+               and makes it mean something: holding the span fixes the outer
+               interval and lets the two inner voices roam; holding the lower
+               interval leaves a triangle of triads over a fixed bass step. -->
+          <fieldset data-mode="tetrads" class="mode-off" id="tetrad-field-fieldset" style="display:none">
+            <legend>Field</legend>
+            <div class="seg" id="tetrad-show-seg">
+              <button data-v="tetradSlice" class="on"
+                title="A plane through the field, opaque, coloured by the entropy where it cuts. ⇧-drag across it to play the tetrad under the pointer.">Cut</button>
+              <button data-v="tetradVolume" class="on"
+                title="The whole field as a translucent body: concordance is opaque, discordance is clear, so the simplest chords hang in it as wells.">Body</button>
+            </div>
+
+            <div class="tune-h">Cut along</div>
+            <div class="seg" id="tetrad-axis-seg">
+              <button data-v="span" class="on"
+                title="Every tetrad with the same outer interval, bass to soprano; the two inner voices roam the triangle. From the apex (a unison) to the base (an equave).">Span</button>
+              <button data-v="lower"
+                title="The lower interval held: a triangle of triads over a fixed bass step.">Lower</button>
+              <button data-v="middle"
+                title="The middle interval held.">Middle</button>
+              <button data-v="upper"
+                title="The upper interval held: a triangle of triads under a fixed top step.">Upper</button>
+            </div>
+
+            <div class="pressrow">
+              <label for="tetradPosition">Position</label>
+              <span class="pressval" id="tetrad-pos-v">600 ¢</span>
+            </div>
+            <input type="range" id="tetradPosition" min="0" max="1000" step="1" value="500"
+              title="Where the cut is: the held interval, in cents.">
+            <button id="tetradSweep"
+              title="Move the cut back and forth through the whole shape on its own — a pass every eight seconds. The slider follows it.">&#8646; Sweep the cut</button>
+
+            <div class="pressrow">
+              <label for="tetradDensity">Density</label>
+              <span class="pressval" id="tetrad-density-v">60%</span>
+            </div>
+            <input type="range" id="tetradDensity" min="0" max="100" step="1" value="60"
+              title="How opaque the body is. Low is a haze only the deepest wells show through; high is a solid you have to cut to see into.">
+            <div class="pressrow">
+              <label for="tetradFocus">Focus</label>
+              <span class="pressval" id="tetrad-focus-v">3.0</span>
+            </div>
+            <input type="range" id="tetradFocus" min="0.5" max="6" step="0.1" value="3"
+              title="How sharply the wells stand out of the body. At 1 the whole tetrahedron is a mist; at 4 only the most concordant few percent deposit anything, and the volume resolves into a constellation of the simplest chords.">
+
+            <div class="pressrow">
+              <label for="tetradSnap">Snap</label>
+              <span class="pressval" id="tetrad-snap-v">off</span>
+            </div>
+            <input type="range" id="tetradSnap" min="0" max="40" step="1" value="0"
+              title="How close the pointer must come to a just tetrad of the set, in cents, before it lands on it exactly. At 0 the cut is continuous everywhere.">
           </fieldset>
 
           <!-- ---- what complexity is allowed to say ----
@@ -740,6 +803,21 @@
               title="How long a voice takes to reach the pitch under the pointer. The attack happens once, when the pointer goes down; this is only how the two voices travel afterwards.">
           </fieldset>
 
+          <!-- Over four voices, for the cut through the entropy field: a
+               ⇧-drag across it is one chord bending through the field, and
+               this is how tightly the four voices follow the hand. Voice
+               Leading above is a different thing — how they travel between
+               two POINTS. -->
+          <fieldset data-mode="tetrads" class="mode-off">
+            <legend>Tracking</legend>
+            <div class="pressrow">
+              <label for="tetradGlide">Portamento</label>
+              <span class="pressval" id="tetrad-glide-v">45 ms</span>
+            </div>
+            <input type="range" id="tetradGlide" min="0" max="400" step="1" value="45"
+              title="How long a voice takes to reach the pitch under the pointer while a cut is being played. The attack happens once, when the pointer goes down on the cut; this is only how the four voices travel afterwards.">
+          </fieldset>
+
           <!-- Keyboard Designer's Play drawer, on the same terms: the family list and
                the slider's range are written in by createTimbrePicker rather
                than spelled out here, so the two apps cannot come to offer
@@ -790,7 +868,7 @@
             <legend>Data</legend>
             <div class="btns">
               <button class="wide" id="dl-csv"
-                title="Every chord in the set — dyads, triads or tetrads, whichever mode is up: the enumerated chord, its notes as ratios, its cents, and its complexity under the chosen measure, sorted simplest first. In Dyads it also carries what the current model says about each interval and, where anybody has been asked, what listeners said. (⇧⌘S)">⬇︎ Save Chords (.csv)</button>
+                title="Every chord in the set — dyads, triads or tetrads, whichever mode is up: the enumerated chord, its notes as ratios, its cents, and its complexity under the chosen measure, sorted simplest first. Where a model is up it also carries what that model says about each chord — harmonic entropy in nats. (⇧⌘S)">⬇︎ Save Chords (.csv)</button>
             </div>
           </fieldset>
         </div>

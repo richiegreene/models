@@ -72,6 +72,18 @@ import {
     invalidate as invalidateDyads,
     applyPivot as applyDyadPivot, resetReference as resetDyadReference,
 } from '../dyads/dyad-mode.js';
+import { buildHeControls } from '../he/he-controls.js';
+import {
+    theParams, tetradModel, setTetradModel, setTetradSlice, setTetradVolume,
+    setTetradAxis, setTetradPosition, tetradSweep, setTetradSweep,
+    setTetradDensity, setTetradFocus, setTetradSnap, setTetradGlide,
+} from '../tetrads/tetrad-state.js';
+import {
+    initTetrads, generateTetradField, refreshFieldIfStale, applySlice, applyBody,
+    leaveTetrads, describeSet as describeTetrads,
+} from '../tetrads/tetrad-mode.js';
+import { resetTetradReference } from '../tetrads/tetrad-audio.js';
+import { equaveCents } from '../tetrads/tetrad-geometry.js';
 
 const $ = (id) => document.getElementById(id);
 
@@ -805,9 +817,15 @@ export function setupUIEventListeners() {
     const modelPress = (id, valueId, apply, format) =>
         press(id, valueId, (v) => { apply(v); scheduleApply('model'); }, format);
 
-    modelPress('heSpread', 'he-spread-v', (v) => { heParams.spread = v; }, (v) => `${v} ¢`);
-    modelPress('heNLimit', 'he-n-v', (v) => { heParams.nLimit = v; }, (v) => `${v}`);
-    modelPress('heAlpha', 'he-alpha-v', (v) => { heParams.alpha = v; }, (v) => v.toFixed(1));
+    /* The entropy's five — spread, order, series, height, kernel — are one
+       block for the three modes, built by he-controls.js over this mode's
+       own numbers. The root slider's range is the one thing that differs:
+       a triad's basis set is cubic in it, and 300 is Sintel's 27 000 000. */
+    buildHeControls($('he-params'), {
+        prefix: 'he', voices: 3, params: heParams,
+        root: { min: 40, max: 400, step: 10 },
+        onChange: () => scheduleApply('model'),
+    });
     modelPress('smPartials', 'sm-partials-v', (v) => { smParams.partials = v; }, (v) => `${v}`);
     modelPress('smStep', 'sm-step-v', (v) => { smParams.step = v; }, (v) => v.toFixed(3));
     modelPress('smRamp', 'sm-ramp-v', (v) => { smParams.ramp = v; }, (v) => v.toFixed(1));
@@ -929,9 +947,13 @@ export function setupUIEventListeners() {
     const dyadModelPress = (id, valueId, apply, format) =>
         press(id, valueId, (v) => { apply(v); scheduleApply('model'); }, format);
 
-    dyadModelPress('dheSpread', 'dhe-spread-v', (v) => { dheParams.spread = v; }, (v) => `${v} ¢`);
-    dyadModelPress('dheNLimit', 'dhe-n-v', (v) => { dheParams.nLimit = v; }, (v) => `${v}`);
-    dyadModelPress('dheAlpha', 'dhe-alpha-v', (v) => { dheParams.alpha = v; }, (v) => v.toFixed(1));
+    /* The same block the triangle has, over dheParams. Root 100 is the
+       wiki's n·d ≤ 10 000, and the axis is a line so 400 is still instant. */
+    buildHeControls($('dhe-params'), {
+        prefix: 'dhe', voices: 2, params: dheParams,
+        root: { min: 20, max: 400, step: 5 },
+        onChange: () => scheduleApply('model'),
+    });
     dyadModelPress('dsmPartials', 'dsm-partials-v', (v) => { dsmParams.partials = v; }, (v) => `${v}`);
     dyadModelPress('dsmRamp', 'dsm-ramp-v', (v) => { dsmParams.ramp = v; }, (v) => v.toFixed(1));
     dyadModelPress('dtnSoftness', 'dtn-soft-v', (v) => { dtnParams.softness = v; }, (v) => `${v} ¢`);
@@ -999,6 +1021,92 @@ export function setupUIEventListeners() {
     dyadPivotSeg.addEventListener('click', (ev) => {
         const btn = ev.target.closest('button');
         if (btn && dyadPivotSeg.contains(btn)) pickDyadPivot(parseInt(btn.dataset.v));
+    });
+
+    /* ---------------------------------------------------------------------
+     *  Tetrads: the field
+     *
+     *  The tetrahedron's own controls — limit, points, pivot, slide — are
+     *  wired where they always were. This is only what the entropy field
+     *  adds: which model, its five numbers, and how the volume is cut and
+     *  shown. Same two rules as the other modes: nothing here writes a
+     *  setting another mode reads, and nothing recomputes the field except
+     *  through the settle timer.
+     * ------------------------------------------------------------------ */
+    const tetradFieldFieldset = $('tetrad-field-fieldset');
+    const theParamsEl = $('the-params');
+    const tetradResRow = $('tetrad-res-row'), tetradResInput = $('tetradResolution');
+    const showTetradModelParams = (model) => {
+        const on = model === 'he';
+        theParamsEl.style.display = on ? 'block' : 'none';
+        tetradResRow.style.display = on ? 'flex' : 'none';
+        tetradResInput.style.display = on ? 'block' : 'none';
+        tetradFieldFieldset.style.display = on ? 'block' : 'none';
+    };
+    seg('tetrad-model-seg', (v) => {
+        setTetradModel(v);
+        showTetradModelParams(v);
+        scheduleApply('model');
+    });
+    const bootTetradModel = $('tetrad-model-seg').querySelector('button.on')?.dataset.v || 'blank';
+    setTetradModel(bootTetradModel);
+    showTetradModelParams(bootTetradModel);
+
+    /* Root 60 is a·b·c·d ≤ 60⁴; the set is quartic in it, so the slider
+       stops at 90 — a million and a half tetrads, and a few seconds. */
+    buildHeControls(theParamsEl, {
+        prefix: 'the', voices: 4, params: theParams,
+        root: { min: 20, max: 90, step: 2 },
+        onChange: () => scheduleApply('model'),
+    });
+    const E = () => equaveCents(parseFloat($('equaveRatio').value) || 2);
+    press('tetradResolution', 'tetrad-res-v',
+        (v) => { theParams.resolution = v; scheduleApply('model'); },
+        (v) => `${v}³ · ${(E() / (v - 1)).toFixed(1)} ¢`);
+
+    /* ---- how the volume is cut and shown ----
+     * All of these change the picture and nothing else, so they apply at
+     * once: the cut is three vertices and the body's two numbers are
+     * uniforms, and neither needs the field recomputed. */
+    flagSeg('tetrad-show-seg', {
+        tetradSlice: (on) => { setTetradSlice(on); applySlice(); },
+        tetradVolume: (on) => { setTetradVolume(on); applySlice(); },
+    });
+    const showTetradPosition = press('tetradPosition', 'tetrad-pos-v',
+        (v) => { setTetradPosition(v / 1000); applySlice(); },
+        (v) => `${Math.round((v / 1000) * E())} ¢`);
+    seg('tetrad-axis-seg', (v) => { setTetradAxis(v); applySlice(); showTetradPosition(); });
+    /* The equave changes what the position is a fraction OF. */
+    $('equaveRatio').addEventListener('input', () => {
+        showTetradPosition();
+        $('tetrad-res-v').textContent = `${theParams.resolution}³ · ${(E() / (theParams.resolution - 1)).toFixed(1)} ¢`;
+    });
+
+    const sweepButton = $('tetradSweep');
+    sweepButton.addEventListener('click', () => {
+        setTetradSweep(!tetradSweep);
+        sweepButton.classList.toggle('latched', tetradSweep);
+    });
+
+    press('tetradDensity', 'tetrad-density-v',
+        (v) => { setTetradDensity(v / 100); applyBody(); },
+        (v) => `${Math.round(v)}%`);
+    press('tetradFocus', 'tetrad-focus-v',
+        (v) => { setTetradFocus(v); applyBody(); },
+        (v) => v.toFixed(1));
+    press('tetradSnap', 'tetrad-snap-v',
+        (v) => { setTetradSnap(v); },
+        (v) => (v > 0 ? `${Math.round(v)} ¢` : 'off'));
+    press('tetradGlide', 'tetrad-glide-v',
+        (v) => setTetradGlide(v / 1000),
+        (v) => (v >= 1000 ? `${(v / 1000).toFixed(2)} s` : `${Math.round(v)} ms`));
+
+    /* The field goes into the tetrahedron's scene now, while the slider it
+       reports a sweep to exists — the scene itself has existed since
+       initThreeJS. */
+    initTetrads((t) => {
+        $('tetradPosition').value = Math.round(t * 1000);
+        showTetradPosition();
     });
 
     /* ---------------- Motion ----------------
@@ -1312,8 +1420,14 @@ export function setupUIEventListeners() {
                 if (wantModel) {
                     if (appMode === 'triads') await generateSurface(triadModel);
                     else if (appMode === 'dyads') await generateDyadModel(dyadModel);
+                    else await generateTetradField(tetradModel);
+                } else if (wantSet && appMode === 'tetrads') {
+                    /* An equave change rebuilds the set through the 'set'
+                       path, and a field computed for the old equave is a
+                       wrong diagram rather than a stale one. */
+                    await refreshFieldIfStale();
                 }
-                if (appMode === 'tetrads') showStatus('tetrads');
+                if (appMode === 'tetrads') showStatus(describeTetrads());
             }
         } finally {
             running = false;
@@ -1344,7 +1458,7 @@ export function setupUIEventListeners() {
         title: 'Tetrads',
         view: () => 'tetra',
         resize: onWindowResize,
-        leave: () => { layoutOnLeaving = currentLayoutMode; },
+        leave: () => { layoutOnLeaving = currentLayoutMode; leaveTetrads(); },
         enter: async () => {
             if (!tetradsBuilt) {
                 tetradsBuilt = true;
@@ -1355,7 +1469,11 @@ export function setupUIEventListeners() {
                 await setLayoutMode(currentLayoutMode);
             }
             layoutOnLeaving = null;
-            showStatus('tetrads');
+            /* A field chosen before the first visit, or one the equave has
+               moved out from under while another mode was up, is built on
+               the way in — generateTetradField serves a cached one for free. */
+            if (tetradModel !== 'blank') await generateTetradField(tetradModel);
+            showStatus(describeTetrads());
         },
     });
 
@@ -1415,6 +1533,7 @@ export function setupUIEventListeners() {
             setLastPlayedRatios([]);
             resetReference();
             resetDyadReference();
+            resetTetradReference();
         }
     });
 }

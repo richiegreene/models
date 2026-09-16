@@ -120,10 +120,20 @@ export let triadPivot = 0;
 export function setTriadPivot(v) { triadPivot = v; }
 
 /* ---- model parameters ----
-   Defaults are Isoharmonics' own where it has them, said in the units the
-   panel asks for. Resolution is the grid both models are sampled onto; it is
-   shared because the two are meant to be comparable. */
-export const heParams = { resolution: 420, nLimit: 300, spread: 17, alpha: 7 };
+   The entropy's are the wiki's own — see he-python.js — said in the units the
+   panel asks for: `spread` is s in cents (17 ≈ 1 %), `alpha` the Rényi order
+   (4 to open on, the same in all three modes — 1 is Shannon, the original,
+   and 7 is Sintel's), `series` which height bounds the basis set
+   and so which weighting it gets, `root` the bound as the slider states it
+   (Tenney: a·b·c ≤ root³ — 300 is Sintel's 27 000 000), and `kernel` the
+   spreading function. The three modes keep one set each rather than sharing,
+   because the cost of a resolution is not the same in one dimension as in
+   three — but the fields are the same fields, and the same words. Resolution
+   is the grid both models are sampled onto; it is shared because the two are
+   meant to be comparable. */
+export const heParams = {
+    resolution: 420, root: 300, series: 'tenney', spread: 17, alpha: 4, kernel: 'gaussian',
+};
 export const smParams = { resolution: 420, partials: 12, step: 0.02, spread: 20, ramp: 1 };
 
 /**

@@ -19,6 +19,18 @@ import { initAudio, stopChord, playChord } from '../components/audio-engine.js';
 import { sendMpePressure, mpeChannels } from '../midi/midi-output.js';
 import { updateMpePressureSliderUI } from '../utils/ui-handlers.js';
 
+/* ---- what the entropy field asks of this scene ----
+   The field is drawn into this scene and played on this canvas, but it is
+   the tetrad modules' own business; rather than this file importing them (and
+   them importing this file's transform, which would be a cycle) they hand
+   in the two things they need: a hook run every frame before the render,
+   and a guard that says a cut is being played so the sprite hover stands
+   down. See initTetrads in tetrad-mode.js. */
+const frameHooks = [];
+let hoverGuard = () => false;
+export function addFrameHook(fn) { frameHooks.push(fn); }
+export function setHoverGuard(fn) { hoverGuard = fn; }
+
 // Create a circular texture for points
 function createCircleTexture() {
     const canvas = document.createElement('canvas');
@@ -243,6 +255,7 @@ function onKeyUp(event) {
 
 function onMouseMove(event) {
     if (appMode !== 'tetrads') return;
+    if (hoverGuard()) return;
     if (!isShiftHeld) {
         if (currentlyHovered) {
             stopChord();
@@ -280,6 +293,7 @@ function onMouseMove(event) {
 
 function onClick(event) {
     if (appMode !== 'tetrads') return;
+    if (hoverGuard()) return;
     if (!isClickPlayModeActive) {
         return;
     }
@@ -413,6 +427,8 @@ export function animate() {
             }
         });
     }
+
+    for (const hook of frameHooks) hook();
 
     if (renderer && scene && camera) {
         renderer.render(scene, camera);

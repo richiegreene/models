@@ -155,9 +155,11 @@ from dyads_generator import harmonic_entropy_curve
 harmonic_entropy_curve(
     axis_ratio=${axisRatio},
     width=${Math.round(dheParams.resolution)},
-    n_limit=${Math.round(dheParams.nLimit)},
-    alpha=${dheParams.alpha},
-    spread_cents=${dheParams.spread}
+    root=${Math.round(dheParams.root)},
+    series="${dheParams.series === 'weil' ? 'weil' : 'tenney'}",
+    alpha=${Number(dheParams.alpha)},
+    spread_cents=${Number(dheParams.spread)},
+    beta=${dheParams.kernel === 'laplace' ? 1 : 2}
 )
             `);
         } else if (model === 'sethares') {
@@ -201,7 +203,8 @@ tenney_curve(
        or the Float32Array is left pointing at freed WASM memory. */
     const obj = packed.toJs ? packed.toJs({ create_proxies: false }) : packed;
     const plain = obj instanceof Map
-        ? { n: obj.get('n'), min: obj.get('min'), max: obj.get('max'), data: obj.get('data') }
+        ? { n: obj.get('n'), min: obj.get('min'), max: obj.get('max'),
+            up: obj.get('up'), unit: obj.get('unit'), count: obj.get('count'), data: obj.get('data') }
         : obj;
     curve = wrapCurve({ ...plain, data: Uint8Array.from(plain.data) });
     if (packed.destroy) packed.destroy();

@@ -515,7 +515,8 @@ function drawCursor(o, C, axis) {
     const curve = currentCurve();
     const raw = curve ? valueAtCents(curve, cursor.c, C) : NaN;
     const parts = [`${Math.round(cursor.c)}¢`];
-    if (raw === raw) parts.push(raw.toFixed(3));
+    /* The model's own number, in its own unit — nats, for an entropy. */
+    if (raw === raw) parts.push(raw.toFixed(3) + (curve.unit ? ` ${curve.unit}` : ''));
 
     const text = parts.join('  ·  ');
     ctx.font = '11px -apple-system, "Segoe UI", Helvetica, Arial, sans-serif';

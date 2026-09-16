@@ -8,6 +8,16 @@ import {
 } from '../globals.js';
 import { transformToRegularTetrahedron, makeTextSprite, makePointSprite } from '../components/three-visualizer.js';
 import { colormapAt, COLORMAP_COUNT, isLightGround } from './color-mapping.js';
+import { restyleField } from '../tetrads/tetrad-field.js';
+
+/* ---- the set, as numbers ----
+   The sprites used to be the only record of which tetrads had been
+   generated: the CSV read them back off the scene. The entropy field needs
+   the set as chords — to snap a drag to the lattice, and to say what the
+   model makes of each one in the CSV — so it is kept here as well, in the
+   form the triangle keeps its triads: { c1, c2, c3, label, complexity }. */
+let tetradSet = [];
+export function currentTetradSet() { return tetradSet; }
 
 /* The ground is no longer a property of the layout — it is the theme, and
    every layout is drawn on it. `colormapAt(...).ground` still answers for it,
@@ -75,6 +85,9 @@ export async function setLayoutMode(index) {
         hideUnisonVoices, omitOctaves, baseSize, scalingFactor, 
         enableSize, enableColor, layoutDisplay
     );
+    /* The field reads the same ramp through a lookup table of its own, so
+       the two cannot be recoloured separately. */
+    restyleField();
 }
 
 export async function updateTetrahedron(limit_type, limit_value, max_exponent, virtual_fundamental_filter, equave_ratio, complexity_method, hide_unison_voices, omit_octaves, base_size, scaling_factor, enable_size, enable_color, layout_display) {
@@ -154,6 +167,7 @@ export async function updateTetrahedron(limit_type, limit_value, max_exponent, v
 
     const label_conversion_factor = 0.066;
     const point_conversion_factor = 2.5;
+    const nextSet = [];
 
     const internal_label_base_size = base_size * label_conversion_factor;
     const internal_point_base_size = base_size * point_conversion_factor;
@@ -215,6 +229,7 @@ export async function updateTetrahedron(limit_type, limit_value, max_exponent, v
         const label_data = labels_map.get(coords_key);
         const label_text = label_data ? label_data.label : undefined;
         const complexity = label_data ? label_data.complexity : undefined;
+        if (label_text) nextSet.push({ c1, c2, c3, label: label_text, complexity: p[3] });
 
         if (layout_display === 'labels') {
             if (label_text) {
@@ -254,8 +269,11 @@ export async function updateTetrahedron(limit_type, limit_value, max_exponent, v
 
         // Add the newly built group to the scene, then remove previous children (swap)
         scene.add(newGroup);
-        previousChildren.forEach(child => scene.remove(child));
+        /* Everything but the entropy field, which belongs to the scene rather
+           than to any one set and has asked to be kept — see attachField. */
+        previousChildren.forEach(child => { if (!child.userData.persistent) scene.remove(child); });
 
         // Publish new sprites as the current active sprites
         setCurrentSprites(tempSprites);
+        tetradSet = nextSet;
 }

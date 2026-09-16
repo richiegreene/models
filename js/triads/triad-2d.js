@@ -182,7 +182,8 @@ export function paintField(field, img, lit) {
     const map = colormapFn();
     const body = chan(lit.color);
     const spec = chan(lit.specular);
-    const span = Math.max(1e-9, field.max - field.min);
+    /* The range is read through normalise(), which also turns an entropy the
+       right way up; nothing here needs the span itself. */
     /* The gradient is per-cell, so a coarse grid has bigger steps for the same
        surface — normalising by the cell width keeps the lighting the same at
        every resolution. */
@@ -193,7 +194,7 @@ export function paintField(field, img, lit) {
         const cx = Math.min(field.w - 1, Math.max(0, x));
         const cy = Math.min(field.h - 1, Math.max(0, y));
         const v = field.z[cy * field.w + cx];
-        return v === v ? (v - field.min) / span : NaN;
+        return v === v ? normalise(field, v) : NaN;
     };
 
     for (let y = 0; y < field.h; y++) {
@@ -324,7 +325,11 @@ function buildContours(field, levels) {
                 const top = () => [(x + lerp(d, c)) * sx, (y + 1) * sy];
                 const left = () => [x * sx, (y + lerp(a, d)) * sy];
 
-                const push = (p, q) => segs.push(p[0], p[1], q[0], q[1], l / (levels + 1));
+                /* The fifth number is where the level sits on the colormap,
+                   1 the most concordant — so an entropy's levels are counted
+                   from the other end. */
+                const push = (p, q) => segs.push(p[0], p[1], q[0], q[1],
+                    field.up < 0 ? 1 - l / (levels + 1) : l / (levels + 1));
 
                 switch (code) {
                     case 1: case 14: push(left(), bottom()); break;

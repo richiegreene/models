@@ -151,9 +151,11 @@ from triads_generator import harmonic_entropy_grid
 harmonic_entropy_grid(
     equave_ratio=${equaveRatio},
     width=${Math.round(heParams.resolution)},
-    n_limit=${Math.round(heParams.nLimit)},
-    alpha=${heParams.alpha},
-    spread_cents=${heParams.spread}
+    root=${Math.round(heParams.root)},
+    series="${heParams.series === 'weil' ? 'weil' : 'tenney'}",
+    alpha=${Number(heParams.alpha)},
+    spread_cents=${Number(heParams.spread)},
+    beta=${heParams.kernel === 'laplace' ? 1 : 2}
 )
             `);
         } else {
@@ -189,7 +191,8 @@ sethares_grid(
        destroyed or the Float32Array is left pointing at freed WASM memory. */
     const obj = packed.toJs ? packed.toJs({ create_proxies: false }) : packed;
     const plain = obj instanceof Map
-        ? { w: obj.get('w'), h: obj.get('h'), min: obj.get('min'), max: obj.get('max'), data: obj.get('data') }
+        ? { w: obj.get('w'), h: obj.get('h'), min: obj.get('min'), max: obj.get('max'),
+            up: obj.get('up'), unit: obj.get('unit'), count: obj.get('count'), data: obj.get('data') }
         : obj;
     field = wrapField({ ...plain, data: Uint8Array.from(plain.data) });
     if (packed.destroy) packed.destroy();

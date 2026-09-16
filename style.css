@@ -224,7 +224,20 @@ button.primary:hover{border-color:var(--accent);color:#fff}
    Continuously are both switches that stay down, so they look alike. */
 #playButton.play-button-active,
 button.latched{background:#24405c;border-color:var(--accent);color:#cfe6ff}
-#autoRotate{width:100%;margin-top:8px}
+#autoRotate,#tetradSweep{width:100%;margin-top:8px}
+
+/* ---------- the entropy's own block ----------
+   Built by he-controls.js for the three modes. The letter after a label is
+   the wiki's own symbol for the setting — s, a, N — set apart from the word
+   so the block can be read against the article it comes from. Series and
+   Kernel are two-way switches and sit side by side: four short words in one
+   row rather than two rows of two. */
+.he-params label i{font-style:italic;font-family:Georgia,"Times New Roman",serif;
+  font-weight:400;color:var(--dim);margin-left:3px;font-size:12px}
+.he-row{display:flex;gap:8px}
+.he-col{flex:1 1 0;min-width:0}
+.he-col .tune-h{margin-top:9px}
+.he-col .seg{margin-bottom:6px}
 .hint{color:var(--dim);font-size:10.5px;margin-top:6px}
 .symbol{font-family:Arial,sans-serif}
 

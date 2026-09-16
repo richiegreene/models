@@ -117,12 +117,23 @@ export function fitTriangle(width, height, pad = 22) {
  *
  * Row 0 is the baseline, so a row index counts upward the way gy does and the
  * flip belongs to whoever is drawing rather than to the data.
+ *
+ * `up` is which way concordance runs — +1 when a peak is a concordance
+ * (Sethares), −1 when the value is an entropy and a concordance is a trough.
+ * The model is not flipped to suit the picture: the number stays the model's
+ * own (nats, for entropy) and normalise() below does the turning, so the
+ * readout and the CSV say what the model said.
  */
 export function wrapField(packed) {
     if (!packed) return null;
     const bytes = packed.data;
     const z = new Float32Array(bytes.buffer, bytes.byteOffset, bytes.byteLength / 4);
-    return { w: packed.w, h: packed.h, min: packed.min, max: packed.max, z };
+    return {
+        w: packed.w, h: packed.h, min: packed.min, max: packed.max, z,
+        up: packed.up === -1 ? -1 : 1,
+        unit: packed.unit || '',
+        count: packed.count || 0,
+    };
 }
 
 /** Bilinear sample at shape coordinates, or NaN outside. */
@@ -148,9 +159,12 @@ export function sampleField(field, gx, gy) {
     return (a * (1 - tx) + b * tx) * (1 - ty) + (c * (1 - tx) + d * tx) * ty;
 }
 
-/** 0..1 across the field's own range, for the colormap and the relief. */
+/** 0..1 across the field's own range, 1 the most concordant — for the
+ *  colormap and the relief, whichever way the model's own numbers run. */
 export function normalise(field, v) {
     if (!field || !(v === v)) return 0;
     const span = field.max - field.min;
-    return span > 1e-12 ? (v - field.min) / span : 0.5;
+    if (!(span > 1e-12)) return 0.5;
+    const t = (v - field.min) / span;
+    return field.up < 0 ? 1 - t : t;
 }

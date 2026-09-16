@@ -73,7 +73,16 @@ export function wrapCurve(packed) {
     if (!packed) return null;
     const bytes = packed.data;
     const z = new Float32Array(bytes.buffer, bytes.byteOffset, bytes.byteLength / 4);
-    return { n: packed.n, min: packed.min, max: packed.max, z };
+    /* `up` is which way concordance runs: +1 when a peak is a concordance,
+       −1 when the value is an entropy and a concordance is a trough. The
+       curve keeps the model's own numbers — nats — and normalise() turns
+       them for the picture. See wrapField in triad-geometry.js. */
+    return {
+        n: packed.n, min: packed.min, max: packed.max, z,
+        up: packed.up === -1 ? -1 : 1,
+        unit: packed.unit || '',
+        count: packed.count || 0,
+    };
 }
 
 /**
@@ -100,11 +109,14 @@ export function valueAtCents(curve, c, C) {
     return C > 0 ? sampleCurve(curve, c / C) : NaN;
 }
 
-/** 0..1 across the curve's own range, for the colormap and the height. */
+/** 0..1 across the curve's own range, 1 the most concordant — for the
+ *  colormap and the height, whichever way the model's numbers run. */
 export function normalise(curve, v) {
     if (!curve || !(v === v)) return 0;
     const span = curve.max - curve.min;
-    return span > 1e-12 ? (v - curve.min) / span : 0.5;
+    if (!(span > 1e-12)) return 0.5;
+    const t = (v - curve.min) / span;
+    return curve.up < 0 ? 1 - t : t;
 }
 
 /**

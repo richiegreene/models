@@ -291,7 +291,7 @@ export function exportTriadCSV() {
         return `${t.label},"${notes}","${cents}",${t.complexity}${field ? ',' + value : ''}`;
     });
 
-    const header = `Chord,Notes,Cents,${measure}` + (field ? `,${model === 'he' ? 'HarmonicEntropy' : 'Sethares'}` : '');
+    const header = `Chord,Notes,Cents,${measure}` + (field ? `,${model === 'he' ? 'HarmonicEntropy(nats)' : 'Sethares'}` : '');
     downloadCSV([header, ...rows].join('\n'), 'triads-export.csv');
 }
 

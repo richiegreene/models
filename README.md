@@ -2,7 +2,7 @@
 ## https://models.richiegreene.com/
 
 Interactive tetrahedron of JI tetrads — a playable triangle of JI triads, and a playable line of JI dyads — with the ability to scale via harmonic complexity models.  
-Sounds, shapes, colors ... Go nuts! Approaching this as a sort of 3D take off of Sintel's [triangle](https://sintel.website/posts/triangle.html). While drawing inspiration from tetradic [harmonic entropy](https://en.xen.wiki/w/Harmonic_entropy) (4HE) this does not render 3D gaussian (multivariate normal) distributions, which are pivotal when considering HE.
+Sounds, shapes, colors ... Go nuts! Approaching this as a sort of 3D take off of Sintel's [triangle](https://sintel.website/posts/triangle.html). All three carry [harmonic entropy](https://en.xen.wiki/w/Harmonic_entropy) as a model — a curve over the dyads, a surface over the triads, and, for the tetrads, a *volume* (4HE) computed with the multivariate Gaussian that pitch space implies, which you can cut through like a tomograph and play. One statement of the model serves the three; see [Harmonic entropy](#harmonic-entropy) at the end.
 
 ## Demo
 ![display demo](https://github.com/user-attachments/assets/4247d114-28db-4907-9da5-dc5b3bece989)
@@ -35,7 +35,7 @@ A dyad has a single degree of freedom, which changes what a picture of it can be
 The **Measure** fieldset chooses what the plot is a picture of. The first option is a different kind of answer from the other three.
 
 * **Ratios** — whichever of the six measures the **Complexity** fieldset is set to: Tenney, Weil, Wilson, Euler, Benedetti, Arithmetic. These are functions of a ratio's two numbers, so they have a value at every just interval and *none between them*. There is no curve; the measure is the height of the lattice itself.
-* **Entropy** — [harmonic entropy](https://en.xen.wiki/w/Harmonic_entropy) along the axis. Every ratio inside the span is stamped at its own cents with weight $1/\sqrt{pq}$, blurred by the ear's uncertainty, and the Rényi entropy of the blur taken. Probabilistic, and knows nothing about timbre.
+* **Entropy** — [harmonic entropy](https://en.xen.wiki/w/Harmonic_entropy) along the axis, in nats. Every ratio under the height bound is stamped at its own cents with weight $1/\|j\|$, blurred by the ear's uncertainty, and the Rényi entropy of the blur taken — the same five settings as the other two modes (**Spread** $s$, **Order** $a$, **Series**, **Height** $N$, **Kernel**), stated once under [Harmonic entropy](#harmonic-entropy). The readout under the cursor and the CSV give the entropy itself; the plot turns it over so that concordant is high, like the other measures. Probabilistic, and knows nothing about timbre.
 * **Sethares** — [sensory dissonance](https://sethares.engr.wisc.edu/consemi.html), every partial of the lower tone against every partial of the upper, from *whatever timbre the Play drawer is currently set to*. Physical, and knows nothing about arithmetic. Only the cross terms are counted: a tone's partials also beat against each other, but that is the same at every interval and including it would flatten the curve without moving a peak.
 * **Tenney** — the Tenney norm *made continuous*. $\log_2(pq)$ is defined only at the ratios, so a parabola is let down from each one and the curve is the lowest surface any of them reaches:
 
@@ -68,7 +68,7 @@ Three voices, two intervals, and a concordance surface you can drag a chord acro
 ### Models
 What the ground between the just triads is measuring. Pick one and it builds itself; move any of its numbers and it rebuilds a moment after your hand comes off.
 * **Blank** — no field: the JI lattice on a plain ground
-* **Entropy** — [harmonic entropy](https://en.xen.wiki/w/Harmonic_entropy) over the triangle, from [Isoharmonics](https://github.com/richiegreene/isoharmonics). Every triad in the equave is stamped at its point with weight $1/\sqrt{ijk}$, blurred, and the Rényi entropy of the blur taken. Peaks are concordances. Spread is asked in cents rather than pixels, so raising Resolution sharpens the picture instead of changing the model.
+* **Entropy** — [harmonic entropy](https://en.xen.wiki/w/Harmonic_entropy) over the triangle, after Sintel's [3HE notebook](https://gist.github.com/Sin-tel/8d1a55a0e34ca159ac6aa61e325648d2). Every triad under the height bound is stamped at its point with weight $1/\sqrt{abc}$, blurred by an isotropic Gaussian — which is what "every voice mistuned independently" comes to on the equilateral triangle, with $\sigma = s\sqrt{3}/2$ — and the Rényi entropy of the blur taken. Peaks are concordances (the surface is lifted by concordance; the numbers underneath are entropy in nats, which is what the CSV carries). The five settings are the same as the other two modes', under [Harmonic entropy](#harmonic-entropy). Spread is asked in cents rather than pixels, so raising Resolution sharpens the picture instead of changing the model.
 * **Sethares** — [sensory dissonance](https://sethares.engr.wisc.edu/consemi.html), computed from the partials of *whatever timbre the Play drawer is currently set to*. Change the wave and the surface changes with it, which is the whole claim of the model: how rough a chord sounds is a fact about its spectrum, not only about its ratios.
 
 ### Display
@@ -88,6 +88,34 @@ The **Pivot** — **S**, **A** or **T** — is the voice held still while the ot
 * **.svg** — the shading is an embedded image (a continuously shaded scalar field is not vector art), but everything drawn on it stays vector: contours are paths, the lattice is circles, the labels are text. Turn Fill off and Lines on and the file is vectors end to end.
 * **.png** — the flat pane rasterised from that SVG at up to 4x; the lifted pane straight from the view.
 * **.csv** — the triads, with a column for the current model's value at each one.
+
+## Tetrads
+Four voices, three intervals, one point per chord — and, since the field, a volume between the points.
+
+### Model
+What fills the tetrahedron. **Blank** is the points on their own. **Entropy** is [harmonic entropy](https://en.xen.wiki/w/Harmonic_entropy) over the whole shape — at every point, in just intonation or not — computed as a $128^3$ volume in a second or two, with the same five settings as the line and the triangle ([Harmonic entropy](#harmonic-entropy)) and its own **Resolution** in cells per axis. The readout beside Resolution says what a cell is in cents, and the foot marks ⚠ when the cell is too coarse for the order asked for (a Rényi order $a$ is taken with the kernel narrowed by $\sqrt{a}$; hover the foot for the sentence).
+
+The blur is *not* isotropic in the three intervals: pitch space says the intervals of a chord whose voices are independently mistuned are correlated, and the volume is blurred with exactly that Gaussian — see [Chords](#chords). The set of tetrads the entropy is taken against is every tetrad under the height bound, not only those the limit admits; the limit decides which are *marked*.
+
+### Field
+A volume cannot be looked at the way a surface can — every point is behind some other point — so there are two pictures of it, and they are independent switches like the triangle's Fill and Lines:
+
+* **Cut** — a plane through the field, opaque, coloured by the entropy exactly where it cuts: a tomograph's section. It is always parallel to a face, which keeps it a triangle and makes it mean something. **Cut along** chooses which interval it holds constant, and **Position** is that interval in cents:
+  * **Span** — every tetrad with the same outer interval, bass to soprano; the two inner voices roam the triangle. From the apex (a unison) to the base (the whole equave — where the section is the triads' own triangle with an octave added).
+  * **Lower** — the lower interval held: a triangle of triads over a fixed bass step.
+  * **Middle** — the middle interval held.
+  * **Upper** — the upper interval held: a triangle of triads under a fixed top step.
+* **Body** — the whole field as a translucent solid, drawn by marching a ray through it from the eye: concordance is opaque and discordance is clear, so the simplest chords hang in it as wells and turning the shape turns the constellation. **Density** is how opaque; **Focus** is how sharply the wells stand out of the haze (an exponent on concordance — at 1 the whole shape is a mist, at 4 only the most concordant few percent show).
+
+Both together is the picture the mode is for: a bright section moving through a ghost. The body stops at the cut on the eye's side, so the section reads as the face of a solid you have opened. **Sweep the cut** moves it back and forth through the whole shape on its own, a pass every eight seconds, with the slider following.
+
+The field is drawn in WebGL2 (a filtered 3D texture on the card); the colormap and the theme apply to it as to everything else, and **Type/Setting › None** takes the points away to leave the field alone.
+
+### Playing the cut
+**⇧-drag** on the cut sounds the tetrad under the pointer and leads it across the section — Tetrads' own modifier, and the triangle's own gesture: the four voices are struck once, on the way down, and every move after that glides those same running voices, so a drag is one chord bending through the field. **Tracking › Portamento** is how tightly they follow. The pivot is the tetrahedron's S/A/T/B, and the two ways of playing share it: a drag picks up from the last hovered point, and a hover afterwards leads from wherever the drag ended. **Snap** lands the pointer on the nearest just tetrad of the set within so many cents. A bead marks the sounding chord; with Display Notation on, the readout spells the simplest just tetrad within a few cents of it.
+
+### Export, in Tetrads
+With the field up, **.png** is the view itself — a ray-marched volume is not a vector and never will be — at screen resolution; **.svg** stays the points as vectors. **.csv** carries a `HarmonicEntropy(nats)` column when the field is up: the value at each tetrad's own point, read from the same cells the picture is drawn from.
 
 ## Display 
 ### Controls
@@ -166,3 +194,50 @@ What the camera is looking at, at the size of the viewport, with anything outsid
 ### Data
 * Save Chords (.csv): ⇧⌘S
   * Enumerated Chords ($a:b:c:d$), Notes ($\dfrac{n}{d}$), Cents, and Complexity — sorted simplest first.
+
+## Harmonic entropy
+One statement of the model serves the three modes: it is written to Pyodide as `he_core.py` (source in [js/he/he-python.js](js/he/he-python.js)), and each mode's generator does only what is particular to its dimension — which chords are in the basis set, and where they land on the grid. Sources: the Xenharmonic Wiki's [Harmonic entropy](https://en.xen.wiki/w/Harmonic_entropy) (Erlich; the convolution form and the Rényi generalisation by Battaglia), Mike Battaglia's [HE-JS](http://www.mikebattagliamusic.com/HE-JS/HE.html) calculator, and Sintel's [harmonic_entropy_triads.ipynb](https://gist.github.com/Sin-tel/8d1a55a0e34ca159ac6aa61e325648d2).
+
+### The model
+An incoming chord $c$ (an interval in cents; a point in two or three intervals for triads and tetrads) is matched against a basis set $J$ of just chords. Each $j \in J$ is given an unnormalised probability from a **spreading function** $S$ centred on $j$ and a **weight** $\|j\|$:
+
+$$Q(j\,|\,c) = \frac{S(\mathrm{¢}(j) - c)}{\|j\|}, \qquad P(j\,|\,c) = \frac{Q(j\,|\,c)}{\sum_{k \in J} Q(k\,|\,c)}$$
+
+and the harmonic entropy of $c$ is the entropy of that distribution. **Order** $a$ selects the [Rényi entropy](https://en.xen.wiki/w/Harmonic_entropy#Harmonic_R%C3%A9nyi_entropy):
+
+$$\mathrm{HE}_a(c) = \frac{1}{1-a}\,\log \sum_{j \in J} P(j\,|\,c)^a$$
+
+with $a \to 1$ Shannon's $-\sum P \log P$ (Erlich's original), $a = 2$ collision entropy, and $a \to \infty$ min-entropy $-\log \max P$. The app opens at $a = 4$ in all three modes; 1 is the wiki's worked example and 7 is Sintel's. Nats throughout.
+
+### The basis set and its weights
+**Series** and **Height** $N$ decide which chords are in $J$ and, with them, the weighting — because the weight is the width of the domain each chord owns between its neighbours, which Erlich observed to scale with the height the set is bounded by:
+
+| Series | Basis set | $\|j\|$ |
+|---|---|---|
+| Tenney | $n d \le N$ (chords: $a b c \cdots \le N$) | $\sqrt{nd}$ (chords: $\sqrt{abc\cdots}$) |
+| Weil | $\max(n,d) \le N$ (chords: $\max \le N$) | $\max(n,d)$ (chords: $\max$) |
+
+The Height slider sets the **root** of the bound, so that one number is one depth of series in every mode: root 100 is $nd \le 10\,000$ for a dyad (the wiki's and HE-JS's default) and $abc \le 10^6$ for a triad; root 300 is Sintel's $abc \le 27\,000\,000$; root 60 is $abcd \le 60^4$. Only reduced chords are stamped ($\gcd = 1$), and every ordering of a chord within reach of an edge of the picture is stamped too — the dyad $d/n$ below the unison, the triad $a{:}c{:}b$ across the bottom edge from $a{:}b{:}c$ — so an edge is a real neighbourhood and not a cliff in the basis set.
+
+### The spreading function
+**Spread** $s$ is the standard deviation of $S$ in cents; 17 ¢ is the canonical one percent of frequency, and the panel says both. **Kernel** is its shape: Gaussian $\exp(-x^2/2s^2)$, or the heavier-tailed Laplace ("Vos") curve $\exp(-\sqrt2\,|x|/s)$, scaled to the same $s$ — the two members of the generalised normal family the wiki mentions.
+
+### Computed by convolution
+Stamp every basis chord onto a grid as a delta of weight $1/\|j\|$ (the kernel $K$) and of weight $1/\|j\|^a$ ($K^a$). Then, as the wiki's convolution-based expression has it,
+
+$$\psi(c) = [S * K](c), \qquad \rho_a(c) = [S^a * K^a](c), \qquad \mathrm{HE}_a(c) = \frac{1}{1-a}\,\log\frac{\rho_a(c)}{\psi(c)^a}$$
+
+which is $O(N \log N)$ by FFT; the scale of $S$ cancels in the quotient, so the kernel is never normalised. For $a = 1$ the same trick gives Shannon exactly rather than as a limit:
+
+$$\sum_j Q\log Q = [S * K_{w\log w}] + [(S\log S) * K], \qquad \mathrm{HE}_1 = \log\psi - \frac{\sum_j Q\log Q}{\psi}$$
+
+The line is 1600 samples over the axis and the triangle 420 across, both with a cell far finer than $s$, and a chord that falls between cells is split between them (HE-JS's interpolation). The volume's cell is a fraction of $s$, and there a chord is stamped to its nearest cell instead (Sintel's method): splitting a stamp lowers the entropy at the minima by the gap between the power mean and the plain mean of the kernel across a cell, which is a thousandth of a nat at one cent and a third of a nat at two thirds of $s$. Against a straight port of HE-JS the line agrees to four decimal places at every order.
+
+### Chords
+A chord of $n$ voices is a point in $n-1$ successive intervals $d = (c_1, c_2, \ldots)$, and the spreading function has to say how the ear's uncertainty spreads over those. The one assumption that generalises the dyad without a new parameter: each voice is independently mistuned by $\mathcal N(0, s^2/2)$, so that every pairwise interval — a difference of two voices — has standard deviation exactly $s$. The intervals then have covariance
+
+$$\Sigma = \frac{s^2}{2}\,D, \qquad D = \mathrm{tridiag}(-1,\,2,\,-1), \qquad S(d) = \exp\!\left(-\tfrac12\, d^{\mathsf T}\Sigma^{-1} d\right)$$
+
+For three voices $\Sigma^{-1} = \frac{2}{3s^2}\begin{pmatrix}2&1\\1&2\end{pmatrix}$, which is **isotropic** in Sintel's equilateral coordinates $x = c_1 + c_2/2,\; y = c_2\sqrt3/2$ with $\sigma = s\sqrt3/2$ — his std of 15 is $s \approx 17.3$ ¢, the canonical one percent. That is why the triangle is the honest picture of a triad: it is pitch space's own metric. For four voices $\Sigma^{-1} = \frac{1}{2s^2}\begin{pmatrix}3&2&1\\2&4&2\\1&2&3\end{pmatrix}$, and no linear picture is both a regular tetrahedron and isotropic (the interval simplex under that metric is a disphenoid), so the volume keeps the regular tetrahedron the app has always drawn and states the kernel in interval coordinates as the anisotropic Gaussian above: each interval's marginal spread is $s$, adjacent intervals anticorrelated by $-\tfrac12$ exactly as they are when the voice they share moves.
+
+The volume is a cube of $R^3$ cells over $[0,E]^3$ in $(c_1, c_2, c_3)$; the tetrahedron is its simplex under the barycentric map $u = c_1/E,\; v = c_2/E,\; w = c_3/E,\; a_0 = 1-u-v-w$ (the apex is $1{:}1{:}1{:}1$, the base corners the tetrads with the whole equave in one interval), and a cut holding one barycentric coordinate constant is a triangle parallel to a face — which is what the Field drawer's four axes are.

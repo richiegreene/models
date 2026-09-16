@@ -133,8 +133,13 @@ export function setDyadSpan(v) { dyadSpan = v; }
 
 /* ---- model parameters ----
    Spread, order and depth are asked in the units the models are stated in, and
-   the resolution is shared by all three so the curves are comparable. */
-export const dheParams = { resolution: 1600, nLimit: 160, spread: 17, alpha: 7 };
+   the resolution is shared by all three so the curves are comparable. The
+   entropy's are the wiki's: s = 17 ¢ (1 %), order 4, and the Tenney series
+   to n·d ≤ 10 000 — root 100 — which is the wiki's own worked example and
+   HE-JS's default. See heParams in triad-state.js for what each is. */
+export const dheParams = {
+    resolution: 1600, root: 100, series: 'tenney', spread: 17, alpha: 4, kernel: 'gaussian',
+};
 export const dsmParams = { resolution: 1600, partials: 12, ramp: 1 };
 export const dtnParams = { resolution: 1600, softness: 20, depth: 50 };
 

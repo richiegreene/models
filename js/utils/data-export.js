@@ -1,5 +1,9 @@
 import * as THREE from 'https://unpkg.com/three@0.126.0/build/three.module.js';
-import { camera, currentSprites, scene } from '../globals.js';
+import { camera, currentSprites, scene, renderer } from '../globals.js';
+import { currentTetradSet } from '../calculations/tetrahedron-updater.js';
+import { currentVolume } from '../tetrads/tetrad-volume.js';
+import { tetradModel, tetradSlice, tetradVolume } from '../tetrads/tetrad-state.js';
+import { equaveCents, centsToBary, sampleVolume } from '../tetrads/tetrad-geometry.js';
 
 export function exportToSVG() {
     const svgNS = "http://www.w3.org/2000/svg";
@@ -142,6 +146,24 @@ export function exportToPNG(filename = 'tetrads-export.png') {
     const width = (view && view.clientWidth) || window.innerWidth;
     const height = (view && view.clientHeight) || window.innerHeight;
 
+    /* WITH A FIELD UP, THE PICTURE IS THE VIEW ITSELF.  The SVG below is the
+       points as vectors, and a ray-marched volume is not a vector and never
+       will be — so when the entropy field is showing, the PNG is the WebGL
+       canvas, rendered once more and read straight back, at screen
+       resolution. Read synchronously after the render, because the buffer
+       is not kept after the frame is composited. */
+    if (tetradModel === 'he' && currentVolume() && (tetradSlice || tetradVolume) && renderer) {
+        renderer.render(scene, camera);
+        const url = renderer.domElement.toDataURL('image/png');
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = filename;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        return;
+    }
+
     const MAX_SIDE = 12000, MAX_AREA = 60e6;
     const scale = Math.max(1, Math.min(4, MAX_SIDE / width, MAX_SIDE / height,
                                        Math.sqrt(MAX_AREA / (width * height))));
@@ -201,8 +223,18 @@ export function simplifyFraction(n, d) {
     return `${n / commonDivisor}/${d / commonDivisor}`;
 }
 
+/**
+ * The set, as numbers.
+ *
+ * Read from the set the generator recorded rather than off the sprites, so
+ * it is the same with the marks turned off — and so that the entropy field,
+ * when there is one, can say what it makes of each chord: the value at the
+ * chord's own point, trilinear from the same cells the picture is drawn
+ * from, in nats.
+ */
 export function exportToCSV() {
-    if (currentSprites.length === 0) {
+    const set = currentTetradSet();
+    if (set.length === 0) {
         console.warn("No data to export.");
         return;
     }
@@ -210,34 +242,33 @@ export function exportToCSV() {
     const complexityMethodSelect = document.getElementById('complexityMethod');
     const complexityMethod = complexityMethodSelect.options[complexityMethodSelect.selectedIndex].text;
 
-    let data = [];
-    const processedRatios = new Set();
+    const vol = tetradModel === 'he' ? currentVolume() : null;
+    const E = equaveCents(parseFloat(document.getElementById('equaveRatio').value) || 2);
 
-    currentSprites.forEach(sprite => {
-        if (sprite.userData.ratio && sprite.userData.complexity !== undefined && !processedRatios.has(sprite.userData.ratio)) {
-            const chordRatio = sprite.userData.ratio;
-            const parts = chordRatio.split(':').map(Number);
-            const fundamental = parts[0];
-
-            const notes = parts.map(p => simplifyFraction(p, fundamental)).join(' ');
-            const cents = parts.map(p => Math.round(1200 * Math.log2(p / fundamental))).join(' ');
-
-            data.push({
-                chord: chordRatio,
-                notes: notes,
-                cents: cents,
-                complexity: sprite.userData.complexity
-            });
-            processedRatios.add(chordRatio);
+    const data = [];
+    const seen = new Set();
+    for (const t of set) {
+        if (seen.has(t.label)) continue;
+        seen.add(t.label);
+        const parts = t.label.split(':').map(Number);
+        const fundamental = parts[0];
+        const notes = parts.map(p => simplifyFraction(p, fundamental)).join(' ');
+        const cents = parts.map(p => Math.round(1200 * Math.log2(p / fundamental))).join(' ');
+        let value = '';
+        if (vol) {
+            const b = centsToBary(t.c1, t.c2, t.c3, E);
+            const v = sampleVolume(vol, b.u, b.v, b.w);
+            value = v === v ? v.toFixed(4) : '';
         }
-    });
+        data.push({ chord: t.label, notes, cents, complexity: t.complexity, value });
+    }
 
     // Sort by complexity, lowest first
     data.sort((a, b) => a.complexity - b.complexity);
 
     // Generate CSV content
-    const header = `Chord,Notes,Cents,${complexityMethod}`;
-    const rows = data.map(d => `${d.chord},"${d.notes}","${d.cents}",${d.complexity}`);
+    const header = `Chord,Notes,Cents,${complexityMethod}` + (vol ? ',HarmonicEntropy(nats)' : '');
+    const rows = data.map(d => `${d.chord},"${d.notes}","${d.cents}",${d.complexity}` + (vol ? `,${d.value}` : ''));
     const csvContent = [header, ...rows].join('\n');
 
     downloadCSV(csvContent, 'tetrads-export.csv');

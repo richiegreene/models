@@ -33,6 +33,15 @@
  * whole equave in the lower interval, and the apex is the whole equave in the
  * upper one. Row 0 of the returned array is y = 0; JS flips it when drawing,
  * and the same three numbers address a pixel, a mesh vertex and a chord.
+ *
+ * WHY THAT SHEAR IS NOT ONLY A PICTURE.  It is the metric of pitch space: a
+ * triad heard up to transposition is a point in the plane orthogonal to
+ * (1,1,1), and in that plane the equilateral triangle is the honest shape.
+ * So the ear's uncertainty — every voice mistuned independently — is an
+ * ISOTROPIC Gaussian on this grid, with σ = s·√3/2 for the wiki's interval
+ * spread s; Sintel's std of 15 is s ≈ 17.3 ¢, the canonical one percent.
+ * See chord_metric in he-python.js, which is where the tetrahedron gets the
+ * same answer in one dimension more.
  * ------------------------------------------------------------------ */
 
 export const TRIADS_PY = `import math
@@ -43,6 +52,10 @@ from theory.calculations import (
     get_odd_limit, get_integer_limit, check_prime_limit, parse_primes,
     _generate_valid_numbers, calculate_complexity, cents, gcd,
     get_virtual_fundamental_denominator,
+)
+from he_core import (
+    fftconvolve_same, height_bound, weights, kernel_shape, spreading_kernel,
+    splat, entropy, finite_range, chord_key, chord_unkey,
 )
 
 
@@ -114,23 +127,10 @@ def generate_triads(limit_value, equave_ratio, limit_mode="odd", max_exponent=3,
     return out
 
 
-def _fftconvolve_same(a, k):
-    """scipy.signal.fftconvolve(a, k, mode="same"), in numpy alone.
-
-    scipy was 48 MB of the page's first load and this and the resampling in
-    sethares_grid were all it was used for. Same arithmetic: multiply in the
-    frequency domain at a size that holds the full convolution, then crop to
-    a's shape, centred the way scipy centres it. Padded to a power of two so
-    the transform is never asked for an awkward length.
-    """
-    full = tuple(sa + sk - 1 for sa, sk in zip(a.shape, k.shape))
-    fast = tuple(1 << (n - 1).bit_length() for n in full)
-    if a.ndim == 1:
-        out = np.fft.irfft(np.fft.rfft(a, fast[0]) * np.fft.rfft(k, fast[0]), fast[0])
-    else:
-        out = np.fft.irfft2(np.fft.rfft2(a, fast) * np.fft.rfft2(k, fast), fast)
-    crop = tuple(slice((sk - 1) // 2, (sk - 1) // 2 + sa) for sa, sk in zip(a.shape, k.shape))
-    return out[crop]
+# The FFT convolution lives in he_core now — one statement for the three modes —
+# and keeps its old name here because sethares_grid and the dyads' Plomp-Levelt
+# smoothing were written against it.
+_fftconvolve_same = fftconvolve_same
 
 
 def _grid_shape(width):
@@ -147,69 +147,97 @@ def _triangle_mask(width, height):
     return (ys >= 0) & (ys <= slope * xs + 1e-9) & (ys <= slope * ((width - 1) - xs) + 1e-9)
 
 
-def _pack(z):
+def _pack(z, up=1, **extra):
     """A field, as the flat float32 buffer JS reads it back from.
 
     tolist() on a 420x364 grid is 150,000 Python floats crossing the bridge one
     object at a time; the buffer is one copy. NaN marks outside the triangle
     and survives the round trip, which is what the renderers test for.
+
+    "up" is which way concordance runs: +1 when a peak is a concordance, -1
+    when the value is an entropy and a concordance is a trough. The renderers
+    read it, so an entropy stays in nats all the way to the CSV.
     """
     z = np.asarray(z, dtype=np.float32)
-    finite = z[np.isfinite(z)]
-    lo = float(finite.min()) if finite.size else 0.0
-    hi = float(finite.max()) if finite.size else 1.0
-    return {
+    lo, hi = finite_range(z)
+    out = {
         "w": int(z.shape[1]),
         "h": int(z.shape[0]),
         "min": lo,
         "max": hi,
+        "up": int(up),
         "data": z.tobytes(),
     }
+    out.update(extra)
+    return out
 
 
-def _he_triads(eq, n_limit, c_limit):
-    """The i:j:k the entropy is a blur of, as one (N, 3) array.
+def _he_triads(eq_hi, root, series="tenney"):
+    """The a:b:c the entropy is a blur of, as one (N, 3) array, a <= b <= c.
+
+    Tenney series: a*b*c <= root**3 — Sintel's own set is root 300, the
+    27 000 000 of his notebook. Weil series: c <= root. The span is taken up
+    to eq_hi rather than the equave, because the caller pads the triangle by
+    the kernel's reach and needs the chords just past its top edge.
 
     Isoharmonics builds this with three nested Python loops — about nine
-    million iterations at n_limit 300, each doing a gcd. Here the inner two
-    are one vectorised block per i: j runs over its range, each j gets its own
-    count of k, and np.repeat lays them out flat.
+    million iterations at root 300, each doing a gcd. Here the inner two are
+    one vectorised block per a: b runs over its range, each b gets its own
+    count of c, and np.repeat lays them out flat.
     """
+    weil = series == "weil"
+    N = height_bound(root, 3, series)
     chunks = []
-    for i in range(1, int(n_limit)):
-        j_top = min(int(math.floor(i * eq)), c_limit // i)
-        if j_top < i:
+    for a in range(1, int(root) + 1):
+        top = int(math.floor(a * eq_hi))
+        b_top = min(top, int(root)) if weil else min(top, N // a)
+        if b_top < a:
             continue
-        j = np.arange(i, j_top + 1, dtype=np.int64)
-        k_top = np.minimum(int(math.floor(i * eq)), c_limit // (i * j))
+        b = np.arange(a, b_top + 1, dtype=np.int64)
+        c_top = np.minimum(top, int(root)) if weil else np.minimum(top, N // (a * b))
         # np.intp, not int64: Pyodide's numpy is a 32-bit build, and repeat()
         # refuses an int64 count array there as an unsafe cast. Everything else
-        # stays int64 — i·j·k reaches 27 million and must not wrap.
-        counts = np.maximum(0, k_top - j + 1).astype(np.intp)
+        # stays int64 — a*b*c reaches 27 million and must not wrap.
+        counts = np.maximum(0, c_top - b + 1).astype(np.intp)
         total = int(counts.sum())
         if total == 0:
             continue
-        jj = np.repeat(j, counts)
+        bb = np.repeat(b, counts)
         starts = np.concatenate(([0], np.cumsum(counts)[:-1])).astype(np.int64)
-        kk = jj + (np.arange(total, dtype=np.int64) - np.repeat(starts, counts))
-        ii = np.full(total, i, dtype=np.int64)
-        keep = (np.gcd(np.gcd(ii, jj), kk) == 1) & (ii * jj * kk < c_limit)
+        cc = bb + (np.arange(total, dtype=np.int64) - np.repeat(starts, counts))
+        aa = np.full(total, a, dtype=np.int64)
+        keep = np.gcd(np.gcd(aa, bb), cc) == 1
         if keep.any():
-            chunks.append(np.stack([ii[keep], jj[keep], kk[keep]], axis=1))
+            chunks.append(np.stack([aa[keep], bb[keep], cc[keep]], axis=1))
     if not chunks:
         return np.zeros((0, 3), dtype=np.int64)
     return np.concatenate(chunks)
 
 
-def harmonic_entropy_grid(equave_ratio, width=420, n_limit=300, c_limit=27000000,
-                          alpha=7.0, spread_cents=30.0):
-    """Renyi harmonic entropy over the triangle — Isoharmonics' model, undrawn.
+_PERMS3 = [(0, 2, 1), (1, 0, 2), (1, 2, 0), (2, 0, 1), (2, 1, 0)]
 
-    Every triad inside the equave is stamped at its point with weight
-    1/sqrt(ijk), the field is blurred, and the Renyi entropy of the blur is
-    taken. High where the ear has many simple readings of the same sonority to
-    choose between, low where one reading dominates. Returned as 7 - H so that
-    a concordance is a peak, which is the shape the 3D view lifts.
+
+def _shape_xy(c1, c2):
+    """Cents → Sintel's equilateral coordinates, in cents."""
+    return c1 + c2 / 2.0, c2 * math.sqrt(3) / 2.0
+
+
+def harmonic_entropy_grid(equave_ratio, width=420, root=300, series="tenney",
+                          alpha=4.0, spread_cents=17.0, beta=2.0):
+    """Harmonic Renyi entropy over the triangle, in nats — Sintel's model.
+
+    Every triad under the height bound is stamped at its point with weight
+    1/||j|| (1/sqrt(abc) for the Tenney series, 1/max for Weil), the field is
+    blurred by the spreading function, and the Renyi entropy of the blur is
+    taken by FFT; see he_core. Low where one reading of the sonority
+    dominates, high where the ear has many to choose between.
+
+    The blur is isotropic on this grid with σ = s·√3/2, which is what "every
+    voice mistuned independently" comes to in these coordinates — see the
+    note at the top of this file. The triangle is padded by the kernel's
+    reach and the chords just outside each edge are stamped too — a:c:b lies
+    across the bottom edge from a:b:c, b:a:c across the left one — so an edge
+    is not a cliff in the basis set.
 
     Spread is asked in CENTS rather than in pixels, so a resolution change
     sharpens the picture instead of changing the model.
@@ -220,49 +248,64 @@ def harmonic_entropy_grid(equave_ratio, width=420, n_limit=300, c_limit=27000000
     if not (max_cents > 0):
         return None
 
-    f = _he_triads(eq, n_limit, int(c_limit))
+    cell_x = max_cents / (width - 1)
+    cell_y = (max_cents * math.sqrt(3) / 2.0) / (height - 1)
+    s = float(spread_cents)
+    _, reach = kernel_shape(beta)
+    sigma_grid = s * math.sqrt(3) / 2.0
+    pad_cents = reach * sigma_grid
+    pad_x = int(math.ceil(pad_cents / cell_x))
+    pad_y = int(math.ceil(pad_cents / cell_y))
+
+    f = _he_triads(eq * 2.0 ** (pad_cents / 1200.0), root, series)
     if len(f) == 0:
         return None
+    w = weights(f, series)
 
-    ff = f.astype(np.float64)
-    w = 1.0 / np.sqrt(np.prod(ff, axis=1))
-    c1 = 1200.0 * np.log2(ff[:, 1] / ff[:, 0])
-    c2 = 1200.0 * np.log2(ff[:, 2] / ff[:, 1])
+    def intervals(g):
+        gg = g.astype(np.float64)
+        return 1200.0 * np.log2(gg[:, 1] / gg[:, 0]), 1200.0 * np.log2(gg[:, 2] / gg[:, 1])
 
-    px = np.round(((c1 + c2 / 2.0) / max_cents) * (width - 1)).astype(np.int64)
-    py = np.round((c2 / max_cents) * (height - 1)).astype(np.int64)
-    inside = (px >= 0) & (px < width) & (py >= 0) & (py < height)
-    px, py, w = px[inside], py[inside], w[inside]
-    if px.size == 0:
-        return None
+    c1, c2 = intervals(f)
+    # Reflected copies for the chords within reach of an edge: the other
+    # orderings of a:b:c, kept where they land inside the padded triangle and
+    # made unique, since a chord with a repeated voice has fewer than six.
+    tol = pad_cents / max_cents
+    near = (c1 <= pad_cents) | (c2 <= pad_cents)
+    if near.any():
+        fn = f[near]
+        keys = []
+        for perm in _PERMS3:
+            g = fn[:, list(perm)]
+            p1, p2 = intervals(g)
+            bl = 1.0 - (p1 + p2) / max_cents
+            ok = (p1 / max_cents >= -tol) & (p2 / max_cents >= -tol) & (bl >= -tol)
+            if ok.any():
+                keys.append(chord_key(g[ok]))
+        if keys:
+            images = chord_unkey(np.unique(np.concatenate(keys)), 3)
+            # A reordering of a sorted chord is never itself sorted unless two
+            # voices are equal — and then it IS the chord, already stamped.
+            images = images[~((images[:, 0] <= images[:, 1]) & (images[:, 1] <= images[:, 2]))]
+            if len(images):
+                i1, i2 = intervals(images)
+                c1 = np.concatenate([c1, i1]); c2 = np.concatenate([c2, i2])
+                w = np.concatenate([w, weights(np.sort(images, axis=1), series)])
 
-    k = np.zeros((height, width), dtype=np.float64)
-    k_a = np.zeros((height, width), dtype=np.float64)
-    np.add.at(k, (py, px), w)
-    np.add.at(k_a, (py, px), w ** alpha)
+    x, y = _shape_xy(c1, c2)
+    px = x / cell_x + pad_x
+    py = y / cell_y + pad_y
+    gw, gh = width + 2 * pad_x, height + 2 * pad_y
+    inside = (px > -1) & (px < gw) & (py > -1) & (py < gh)
+    k, k2 = splat((gh, gw), np.stack([py[inside], px[inside]], axis=1), w[inside], alpha)
 
-    std = max(1.0, (float(spread_cents) / max_cents) * width)
-    reach = int(round(std * 4))
-    axis = np.arange(-reach, reach + 1)
-    xv, yv = np.meshgrid(axis, axis)
-    s = np.exp(-((xv ** 2 + yv ** 2) / (2.0 * std ** 2)))
+    # Isotropic here: (4/3) I is chord_metric(3) written in these coordinates,
+    # so the kernel comes out with σ = s·√3/2 on both axes.
+    kernel = spreading_kernel((4.0 / 3.0) * np.eye(2), [cell_y, cell_x], s, beta)
+    h = entropy(k, k2, kernel, alpha)[pad_y:pad_y + height, pad_x:pad_x + width]
 
-    # FFT convolution rather than direct: the kernel is a few hundred pixels
-    # across at the resolutions this is asked at, and direct convolution of two
-    # squares that size is minutes rather than seconds.
-    p_k = _fftconvolve_same(k, s)
-    p_ka = _fftconvolve_same(k_a, s ** alpha)
-
-    eps = 1e-16
-    # fftconvolve can land a hair below zero where the true value is zero, and
-    # a negative base under a fractional power is a NaN hole in the picture.
-    p_k = np.maximum(p_k, 0.0)
-    p_ka = np.maximum(p_ka, 0.0)
-    entropy = (1.0 / (1.0 - alpha)) * np.log((eps + p_ka) / (eps + p_k ** alpha))
-
-    z = 7.0 - entropy
-    z[~_triangle_mask(width, height)] = np.nan
-    return _pack(z)
+    h[~_triangle_mask(width, height)] = np.nan
+    return _pack(h, up=-1, unit="nats", count=int(len(f)))
 
 
 def _dissonance(f1, f2, l1, l2):

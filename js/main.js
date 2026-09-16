@@ -14,6 +14,8 @@ import { setupUIEventListeners } from './utils/ui-handlers.js';
 import { initMidiOutput } from './midi/midi-output.js';
 import { TRIADS_PY } from './triads/triad-python.js';
 import { DYADS_PY } from './dyads/dyad-python.js';
+import { TETRADS_PY } from './tetrads/tetrad-python.js';
+import { HE_CORE_PY } from './he/he-python.js';
 import { applyModeClasses } from './app-mode.js';
 import { initTriads, bootTriads } from './triads/triad-mode.js';
 import { initDyads } from './dyads/dyad-mode.js';
@@ -373,14 +375,21 @@ def generate_ji_tetra_labels(limit_value, equave_ratio, limit_mode='odd', max_ex
     pyodide.FS.writeFile("python/theory/calculations.py", calculations_py_content, { encoding: "utf8" });
     pyodide.FS.writeFile("python/theory/__init__.py", "", { encoding: "utf8" });
 
+    /* Harmonic entropy itself — the weighting, the spreading function, the
+       convolution and the entropy — is one file the three modes import, so
+       "17 ¢, Shannon, Tenney series" is one model read over one interval,
+       two or three. See he-python.js for the exposition and the sources. */
+    pyodide.FS.writeFile("python/he_core.py", HE_CORE_PY, { encoding: "utf8" });
+
     /* The other two modes' generators, written beside the tetrahedron's and
        importing the same theory/calculations.py rather than carrying their own
        copies of the limit tests — so a 13-limit means one thing in this app
        whether it is being read over three intervals, two, or one. Dyads goes
        in after Triads because it imports the Plomp-Levelt kernel from it
-       rather than restating it. */
+       rather than restating it. The tetrahedron's own field is the third. */
     pyodide.FS.writeFile("python/triads_generator.py", TRIADS_PY, { encoding: "utf8" });
     pyodide.FS.writeFile("python/dyads_generator.py", DYADS_PY, { encoding: "utf8" });
+    pyodide.FS.writeFile("python/tetrads_entropy.py", TETRADS_PY, { encoding: "utf8" });
 
     pyodide.runPython("import sys; sys.path.append('./python')");
 

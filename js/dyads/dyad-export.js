@@ -321,7 +321,7 @@ export function exportDyadCSV() {
     });
 
     const header = ['Dyad', 'Ratio', 'Notes', 'Cents', measure]
-        .concat(curve ? [model === 'he' ? 'HarmonicEntropy'
+        .concat(curve ? [model === 'he' ? 'HarmonicEntropy(nats)'
             : model === 'sethares' ? 'Sethares' : 'TenneyContinuous'] : [])
         .join(',');
 

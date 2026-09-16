@@ -49,7 +49,11 @@ from theory.calculations import (
 # The same Plomp-Levelt kernel the triangle's surface is built from, imported
 # rather than copied: there is one statement of roughness in this app and both
 # modes are pictures of it.
-from triads_generator import _dissonance, _fftconvolve_same
+from triads_generator import _dissonance
+from he_core import (
+    fftconvolve_same as _fftconvolve_same, height_bound, weights, chord_metric,
+    spreading_kernel, kernel_shape, splat, entropy, finite_range,
+)
 
 
 def generate_dyads(limit_value, axis_ratio, limit_mode="odd", max_exponent=3,
@@ -116,55 +120,72 @@ def generate_dyads(limit_value, axis_ratio, limit_mode="odd", max_exponent=3,
     return out
 
 
-def _pack(z):
+def _pack(z, up=1, **extra):
     """A curve, as the flat float32 buffer JS reads it back from.
 
     tolist() on a 1600-sample run is 1600 Python floats crossing the bridge one
     object at a time; the buffer is one copy. NaN survives the round trip and
     is what the renderers test for.
+
+    "up" says which way concordance runs: +1 when a peak is a concordance
+    (Sethares and Tenney are returned that way round), -1 when the value is an
+    entropy and a concordance is a trough. The renderers read it rather than
+    the model being flipped to suit them, so the number in the readout and the
+    CSV is the model's own — nats, for entropy.
     """
     z = np.asarray(z, dtype=np.float32)
-    finite = z[np.isfinite(z)]
-    lo = float(finite.min()) if finite.size else 0.0
-    hi = float(finite.max()) if finite.size else 1.0
-    return {"n": int(z.size), "min": lo, "max": hi, "data": z.tobytes()}
+    lo, hi = finite_range(z)
+    out = {"n": int(z.size), "min": lo, "max": hi, "up": int(up), "data": z.tobytes()}
+    out.update(extra)
+    return out
 
 
-def _he_dyads(ax, n_limit, c_limit):
-    """The i:j the entropy is a blur of, as one (N, 2) array.
+def _he_dyads(ax_hi, root, series="tenney"):
+    """The n/d the entropy is a blur of, as one (N, 2) array with n/d >= 1.
 
-    Vectorised the same way the triangle's is: the inner loop over j is one
-    numpy block per i, because in Pyodide a few hundred thousand interpreted
+    Tenney series: n*d <= root**2. Weil ("Farey") series: max(n, d) <= root.
+    Every ratio up to ax_hi is taken — the caller pads the axis by the
+    kernel's reach and asks for that much, and mirrors these below 1/1 itself.
+
+    Vectorised the same way the triangle's is: the inner loop over d is one
+    numpy block per n, because in Pyodide a few hundred thousand interpreted
     iterations is a visible pause on the page's own thread.
     """
+    N = height_bound(root, 2, series)
     chunks = []
-    for i in range(1, int(n_limit) + 1):
-        j_top = min(int(math.floor(i * ax)), c_limit // i)
-        if j_top < i:
+    top_d = int(root) if series == "weil" else int(math.isqrt(N))
+    for d in range(1, top_d + 1):
+        n_top = min(int(math.floor(d * ax_hi)), int(root) if series == "weil" else N // d)
+        if n_top < d:
             continue
-        j = np.arange(i, j_top + 1, dtype=np.int64)
-        ii = np.full(j.size, i, dtype=np.int64)
-        keep = np.gcd(ii, j) == 1
+        n = np.arange(d, n_top + 1, dtype=np.int64)
+        dd = np.full(n.size, d, dtype=np.int64)
+        keep = np.gcd(n, dd) == 1
         if keep.any():
-            chunks.append(np.stack([ii[keep], j[keep]], axis=1))
+            chunks.append(np.stack([n[keep], dd[keep]], axis=1))
     if not chunks:
         return np.zeros((0, 2), dtype=np.int64)
     return np.concatenate(chunks)
 
 
-def harmonic_entropy_curve(axis_ratio, width=1600, n_limit=160, c_limit=1000000,
-                           alpha=7.0, spread_cents=17.0):
-    """Renyi harmonic entropy over the interval axis.
+def harmonic_entropy_curve(axis_ratio, width=1600, root=100, series="tenney",
+                           alpha=4.0, spread_cents=17.0, beta=2.0):
+    """Harmonic Renyi entropy over the interval axis, in nats.
 
-    Every ratio inside the axis is stamped at its own cents with weight
-    1/sqrt(ij), the line is blurred by the ear's uncertainty, and the Renyi
-    entropy of the blur is taken. High where there are many simple readings of
-    the same interval to choose between, low where one reading dominates.
-    Returned as 7 - H so that a concordance is a peak, which is the shape the
-    plot is drawn as and the sign the other three models are stated in.
+        HE_a(c) = 1/(1-a) log sum_j P(j|c)^a,   P(j|c) = S(cents(j) - c)/||j|| / sum
 
-    Spread is asked in CENTS rather than in samples, so raising the resolution
-    sharpens the picture instead of changing the model.
+    Every ratio under the height bound is stamped at its own cents with weight
+    1/||j|| (1/sqrt(nd) for the Tenney series, 1/max(n,d) for Weil), the line
+    is blurred by the spreading function of standard deviation spread_cents
+    (Gaussian for beta 2, Laplace for beta 1), and the Renyi entropy of the
+    blur is taken — by FFT, as HE-JS does it; see he_core. Low where one
+    reading of the interval dominates, high where many are equally likely.
+
+    The axis is padded by the kernel's reach on both sides and the ratios
+    below 1/1 are stamped as well, so the value at 0 cents is the value of the
+    unison and not of an edge. Spread is asked in CENTS rather than in
+    samples, so raising the resolution sharpens the picture instead of
+    changing the model.
     """
     ax = float(axis_ratio)
     width = max(64, int(width))
@@ -172,41 +193,32 @@ def harmonic_entropy_curve(axis_ratio, width=1600, n_limit=160, c_limit=1000000,
     if not (max_cents > 0):
         return None
 
-    f = _he_dyads(ax, n_limit, int(c_limit))
+    cell = max_cents / (width - 1)
+    s = float(spread_cents)
+    _, reach = kernel_shape(beta)
+    pad_cents = reach * s
+    pad = int(math.ceil(pad_cents / cell))
+
+    f = _he_dyads(ax * 2.0 ** (pad_cents / 1200.0), root, series)
     if len(f) == 0:
         return None
+    w = weights(f, series)
+    c = 1200.0 * np.log2(f[:, 0] / f[:, 1])
+    # The mirror image of every ratio within reach below 1/1 — d/n has the
+    # same weight as n/d, and those are what the entropy at 0 cents is an
+    # entropy OF. Without them the unison sits on a cliff.
+    mirror = (c > 0) & (c <= pad_cents)
+    c = np.concatenate([c, -c[mirror]])
+    w = np.concatenate([w, w[mirror]])
 
-    ff = f.astype(np.float64)
-    w = 1.0 / np.sqrt(ff[:, 0] * ff[:, 1])
-    c = 1200.0 * np.log2(ff[:, 1] / ff[:, 0])
+    pos = (c + pad_cents) / cell
+    grid = width + 2 * pad
+    inside = (pos > -1) & (pos < grid)
+    k, k2 = splat((grid,), pos[inside, None], w[inside], alpha)
 
-    px = np.round((c / max_cents) * (width - 1)).astype(np.int64)
-    inside = (px >= 0) & (px < width)
-    px, w = px[inside], w[inside]
-    if px.size == 0:
-        return None
-
-    k = np.zeros(width, dtype=np.float64)
-    k_a = np.zeros(width, dtype=np.float64)
-    np.add.at(k, px, w)
-    np.add.at(k_a, px, w ** alpha)
-
-    std = max(1.0, (float(spread_cents) / max_cents) * width)
-    reach = int(round(std * 4))
-    axis = np.arange(-reach, reach + 1)
-    s = np.exp(-(axis ** 2) / (2.0 * std ** 2))
-
-    p_k = _fftconvolve_same(k, s)
-    p_ka = _fftconvolve_same(k_a, s ** alpha)
-
-    eps = 1e-16
-    # fftconvolve can land a hair below zero where the true value is zero, and
-    # a negative base under a fractional power is a NaN hole in the curve.
-    p_k = np.maximum(p_k, 0.0)
-    p_ka = np.maximum(p_ka, 0.0)
-    entropy = (1.0 / (1.0 - alpha)) * np.log((eps + p_ka) / (eps + p_k ** alpha))
-
-    return _pack(7.0 - entropy)
+    kernel = spreading_kernel(chord_metric(2), [cell], s, beta)
+    h = entropy(k, k2, kernel, alpha)[pad:pad + width]
+    return _pack(h, up=-1, unit="nats", count=int(len(f)))
 
 
 def sethares_curve(spectrum_freq, spectrum_amp, ref_freq, axis_ratio,
