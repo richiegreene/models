@@ -178,6 +178,7 @@ How the sounding chord is written out. Reference pitch: 1/1 = C3 130.8128Hz.
 ### Settings
 * Playback: In-browser audio, MIDI Polyphonic Expression (MPE), or both
 * Portamento: how long (0–5 s) the four voices take to reach the next tetrad. At 0 they arrive at once.
+* Tracking › Arpeggiate (every mode): how far apart (0–1 s) the voices come in when a chord is struck. At 0 they sound together; above it each note keeps its whole envelope, let go as late as it came in, and a voice that has not come in yet enters at the pitch under the pointer, so a drag can carry on while the chord rolls in. The arpeggiato switch beneath it sets the order: **Up** (lowest first), **Down** (highest first) or **Random** (a fresh order on every strike). MPE output is spread the same way, with timestamped MIDI.
 * Set pivot voice (common-tone) with S A T B buttons (or keys)
 * Timbre: two families over the same four shapes — sine, triangle, saw, square
   * Wavetable — a fixed, band-limited waveform, volume-independent

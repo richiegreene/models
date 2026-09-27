@@ -214,7 +214,15 @@ export function setAdsr(next) {
   if (node) node.port.postMessage({ t: 'adsr', ...adsr });
 }
 
-export function noteOn(id, freq, vel = 1) {
+/**
+ * Strike a voice, now or `delay` seconds from now.
+ *
+ * A delay is how a chord is arpeggiated: every voice is sent at once and the
+ * worklet starts each one late, to the sample — see its 'on'. The voice's
+ * release is later by the same amount, so each note keeps its whole
+ * envelope, and any glide sent while it waits moves where it will come in.
+ */
+export function noteOn(id, freq, vel = 1, delay = 0) {
   if (!(freq > 0)) return;
   /* Both of these have to happen on THIS stack, not in a callback: start
      builds the context inside the gesture that asked for the note, and
@@ -224,7 +232,7 @@ export function noteOn(id, freq, vel = 1) {
   /* A sign of use, and the one bang that happens inside a gesture — see bang.
      Before the note, so the engine is awake by the time it arrives. */
   bang('first-note');
-  send({ t: 'on', id, freq, vel });
+  send({ t: 'on', id, freq, vel, delay });
 }
 
 export function noteOff(id) {
@@ -241,8 +249,11 @@ export function noteOff(id) {
  * glide is a message to the running voice instead of a new note.
  */
 export function glide(id, freq, time) {
-  if (!node || !(freq > 0)) return;
-  node.port.postMessage({ t: 'glide', id, freq, time });
+  if (!(freq > 0)) return;
+  /* Queued behind the note it moves, like an OFF: a glide dropped while the
+     worklet loads would leave a late entrance coming in where the pointer
+     WAS rather than where it is. */
+  send({ t: 'glide', id, freq, time });
 }
 
 /** Whether a voice with this id is still sounding — asked before gliding. */

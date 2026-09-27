@@ -115,6 +115,17 @@ export function setDyadSnap(v) { dyadSnap = v; }
 export let dyadGlide = 0.045;
 export function setDyadGlide(v) { dyadGlide = v; }
 
+/**
+ * How far apart the two voices come in when a dyad is struck, in seconds —
+ * 0 is both at once — and which comes first. Heard up, down, or either at
+ * random, a dyad is a melodic interval before it is a harmonic one; see
+ * arpeggio.js.
+ */
+export let dyadArp = 0;
+export let dyadArpOrder = 'up'; // 'up' | 'down' | 'random'
+export function setDyadArp(v) { dyadArp = v; }
+export function setDyadArpOrder(v) { dyadArpOrder = v; }
+
 /** Which of the two voices is held while the other moves. 0 = lower. */
 export let dyadPivot = 0;
 export function setDyadPivot(v) { dyadPivot = v; }

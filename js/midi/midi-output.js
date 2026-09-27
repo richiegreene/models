@@ -15,7 +15,19 @@ const MAX_MPE_CHANNELS = MIDI_CHANNEL_END - MIDI_CHANNEL_START + 1;
 
 // Stores the mapping from a note's index within a chord
 // to its assigned MIDI channel, current base MIDI note, and last sent pitch bend value.
-const activeMpeNotes = new Map(); // Map<index, { channel: number, midiNote: number, lastPitchBend: number }>
+// An arpeggiated note also carries `lag`, how many ms late it was struck, and
+// `onAt`, the performance.now() time it comes in — see sendMpeNoteOn.
+const activeMpeNotes = new Map(); // Map<index, { channel: number, midiNote: number, lastPitchBend: number, lag: number, onAt: number }>
+
+/**
+ * When a note's release is due: as late as the note was struck, so an
+ * arpeggiated chord lets go in the order it came in and each note is held as
+ * long as it would have been together. 0 is now — the Web MIDI timestamp for
+ * "immediately".
+ */
+function releaseAt(noteInfo) {
+    return noteInfo.lag > 0 ? performance.now() + noteInfo.lag : 0;
+}
 
 // Stores active pitch bend glides to allow cancellation
 const activeGlides = new Map(); // Map<noteId, glideIntervalId>
@@ -188,7 +200,16 @@ export async function initMidiOutput() {
     console.log("MIDI output initialization complete. Current midiOutput:", midiOutput);
 }
 
-export function sendMpeNoteOn(index, frequency, velocity = 100) {
+/**
+ * Strike a note, now or `delay` seconds from now.
+ *
+ * A late note — an arpeggiated chord's — is sent at once with a Web MIDI
+ * timestamp, so the device plays it on time however busy the page is. Its
+ * channel is taken now, and a pitch update before it comes in is timestamped
+ * to its entrance too, so it enters where the pointer has got to rather than
+ * where it was struck.
+ */
+export function sendMpeNoteOn(index, frequency, velocity = 100, delay = 0) {
     console.log(`Attempting to send MPE Note On for index: ${index}, freq: ${frequency}. Current midiOutput:`, midiOutput);
     if (!midiOutput) {
         console.warn("No MIDI output selected or available. Cannot send Note On.");
@@ -210,30 +231,39 @@ export function sendMpeNoteOn(index, frequency, velocity = 100) {
     const centsDeviation = (frequencyToMidi(frequency) - midiNote) * 100; // Cents deviation from the nearest MIDI note
     lastPitchBend = centDeviationToPitchBend(centsDeviation);
 
+    const lag = delay > 0 ? delay * 1000 : 0;
+    const onAt = lag > 0 ? performance.now() + lag : 0;
+    if (activeGlides.has(index)) {
+        clearInterval(activeGlides.get(index));
+        activeGlides.delete(index);
+    }
+
     // MPE Pitch Bend Sensitivity RPN message (Controller 101, 100, Data Entry MSB 0, LSB MPE_PITCH_BEND_RANGE)
     // This is typically sent once per channel (or when PB range changes)
-    midiOutput.send([0xB0 | channel, 0x65, 0x00]); // RPN MSB (Pitch Bend Range)
-    midiOutput.send([0xB0 | channel, 0x64, 0x00]); // RPN LSB (Pitch Bend Range)
-    midiOutput.send([0xB0 | channel, 0x06, MPE_PITCH_BEND_RANGE]); // Data Entry MSB (Pitch Bend Range in semitones)
-    midiOutput.send([0xB0 | channel, 0x26, 0x00]); // Data Entry LSB (usually 0)
+    midiOutput.send([0xB0 | channel, 0x65, 0x00], onAt); // RPN MSB (Pitch Bend Range)
+    midiOutput.send([0xB0 | channel, 0x64, 0x00], onAt); // RPN LSB (Pitch Bend Range)
+    midiOutput.send([0xB0 | channel, 0x06, MPE_PITCH_BEND_RANGE], onAt); // Data Entry MSB (Pitch Bend Range in semitones)
+    midiOutput.send([0xB0 | channel, 0x26, 0x00], onAt); // Data Entry LSB (usually 0)
     console.log(`Sent RPN for PB Range on channel ${channel}: ${MPE_PITCH_BEND_RANGE} semitones.`);
 
     const isMpePlayback = playbackMode === 'mpe-midi' || playbackMode === 'both';
 
-    if (enableSlide && isMpePlayback && slideDuration > 0) {
+    /* A late note enters on its pitch: the glide up from centre runs on a
+       timer from now, and would be over before the note had begun. */
+    if (enableSlide && isMpePlayback && slideDuration > 0 && !(lag > 0)) {
         // Send a center pitch bend immediately, then glide
         midiOutput.send([0xE0 | channel, 8192 & 0x7F, (8192 >> 7) & 0x7F]); // Center pitch bend
         startPitchBendGlide(index, channel, 8192, lastPitchBend, slideDuration);
         console.log(`MPE Note On (sliding): index=${index}, freq=${frequency}, MIDI Note=${midiNote}, initial PB=8192, target PB=${lastPitchBend}, channel=${channel}, velocity=${velocity}, slideDuration=${slideDuration}`);
     } else {
         // Send instantaneous pitch bend
-        midiOutput.send([0xE0 | channel, lastPitchBend & 0x7F, (lastPitchBend >> 7) & 0x7F]); // Pitch Bend
+        midiOutput.send([0xE0 | channel, lastPitchBend & 0x7F, (lastPitchBend >> 7) & 0x7F], onAt); // Pitch Bend
         console.log(`MPE Note On (instant): index=${index}, freq=${frequency}, MIDI Note=${midiNote}, PB=${lastPitchBend}, channel=${channel}, velocity=${velocity}`);
     }
     
-    midiOutput.send([0x90 | channel, midiNote, velocity]); // Note On
+    midiOutput.send([0x90 | channel, midiNote, velocity], onAt); // Note On
 
-    activeMpeNotes.set(index, { channel, midiNote, lastPitchBend });
+    activeMpeNotes.set(index, { channel, midiNote, lastPitchBend, lag, onAt });
 }
 
 export function sendMpePressure(channel, pressure) {
@@ -258,7 +288,7 @@ export function sendMpeNoteOff(index, velocity = 64) {
     const noteInfo = activeMpeNotes.get(index);
     if (noteInfo) {
         const { channel, midiNote } = noteInfo;
-        midiOutput.send([0x80 | channel, midiNote, velocity]); // Note Off
+        midiOutput.send([0x80 | channel, midiNote, velocity], releaseAt(noteInfo)); // Note Off
         releaseMpeChannel(channel);
         activeMpeNotes.delete(index);
         // Clear any ongoing glide for this note
@@ -288,7 +318,11 @@ export function sendMpePitchBendUpdate(index, frequency) {
         const isMpePlayback = playbackMode === 'mpe-midi' || playbackMode === 'both';
 
         if (newPitchBend !== noteInfo.lastPitchBend) {
-            if (enableSlide && isMpePlayback && slideDuration > 0) {
+            if (noteInfo.onAt > performance.now()) {
+                /* Not in yet: the bend lands on its entrance, after the one
+                   struck with it, so it comes in where the pointer now is. */
+                midiOutput.send([0xE0 | channel, newPitchBend & 0x7F, (newPitchBend >> 7) & 0x7F], noteInfo.onAt);
+            } else if (enableSlide && isMpePlayback && slideDuration > 0) {
                 // Start a glide from the current pitch bend to the new target
                 startPitchBendGlide(index, channel, noteInfo.lastPitchBend, newPitchBend, slideDuration);
                 console.log(`MPE Pitch Bend Update (sliding): index=${index}, freq=${frequency}, MIDI Note=${midiNote}, PB from=${noteInfo.lastPitchBend} to=${newPitchBend}, channel=${channel}, slideDuration=${slideDuration}`);
@@ -315,7 +349,7 @@ export function releaseAllMpeNotes() {
 
     activeMpeNotes.forEach((noteInfo, noteId) => {
         const { channel, midiNote } = noteInfo;
-        midiOutput.send([0x80 | channel, midiNote, 0]); // Note Off with velocity 0
+        midiOutput.send([0x80 | channel, midiNote, 0], releaseAt(noteInfo)); // Note Off with velocity 0
         releaseMpeChannel(channel);
         console.log(`MPE Note Off (all): noteId=${noteId}, MIDI Note=${midiNote}, channel=${channel}`);
     });

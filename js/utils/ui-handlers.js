@@ -48,6 +48,7 @@ import { estimateWork, sayWork, WORK_BUDGET } from '../calculations/work-estimat
 import { initMidiOutput, sendMpePressure, mpeChannels } from '../midi/midi-output.js';
 import { createTimbrePicker, FILTERED_MIN } from '../synth/timbre.js';
 import { attachAdsrEditor } from '../synth/adsr.js';
+import { arpLabel } from '../synth/arpeggio.js';
 import { setCurrentTimbre } from '../globals.js';
 import {
     appMode, registerMode, switchMode, layout as layoutStage, setStatus as showStatus,
@@ -56,7 +57,8 @@ import {
 import {
     triadModel, triadDots, triadLabels, setTriadModel, setTriadFill, setTriadLines,
     setTriadContours, setTriadLineWidth, setTriadRelief, setTriadDots, setTriadLabels,
-    setTriadSnap, setTriadGlide, setTriadGloss, heParams, smParams,
+    setTriadSnap, setTriadGlide, setTriadGloss, setTriadArp, setTriadArpOrder,
+    heParams, smParams,
 } from '../triads/triad-state.js';
 import {
     refreshSet, generateSurface, applyView, applyPivot,
@@ -66,7 +68,7 @@ import {
     dyadModel, dyadDots, dyadLabels, setDyadModel, setDyadFill, setDyadLine,
     setDyadLineWidth, setDyadRelief, setDyadGrid, setDyadDots, setDyadLabels,
     setDyadSnap, setDyadGlide, setDyadSpan, setDyadResolution,
-    dheParams, dsmParams, dtnParams,
+    setDyadArp, setDyadArpOrder, dheParams, dsmParams, dtnParams,
 } from '../dyads/dyad-state.js';
 import {
     refreshSet as refreshDyadSet, generateModel as generateDyadModel,
@@ -79,6 +81,7 @@ import {
     theParams, tetradModel, setTetradModel, setTetradSlice, setTetradVolume,
     setTetradAxis, setTetradPosition, tetradSweep, setTetradSweep,
     setTetradDensity, setTetradFocus, setTetradSnap, setTetradGlide,
+    setTetradArp, setTetradArpOrder,
 } from '../tetrads/tetrad-state.js';
 import {
     initTetrads, generateTetradField, refreshFieldIfStale, applySlice, applyBody,
@@ -919,6 +922,11 @@ export function setupUIEventListeners() {
         (v) => setTriadGlide(v / 1000),
         (v) => (v >= 1000 ? `${(v / 1000).toFixed(2)} s` : `${Math.round(v)} ms`));
 
+    /* ---- and how they come in ----
+     * The next strike reads these; a chord already sounding is left alone. */
+    press('triadArp', 'triad-arp-v', (v) => setTriadArp(v / 1000), arpLabel);
+    seg('triad-arp-seg', (v) => setTriadArpOrder(v));
+
     /* ---- the pivot, on Tetrads' own terms ----
      * Four voices there, three here, and everything else about it identical:
      * the initial of the part is both the label and the key that selects it.
@@ -1043,6 +1051,8 @@ export function setupUIEventListeners() {
     press('dyadGlide', 'dyad-glide-v',
         (v) => setDyadGlide(v / 1000),
         (v) => (v >= 1000 ? `${(v / 1000).toFixed(2)} s` : `${Math.round(v)} ms`));
+    press('dyadArp', 'dyad-arp-v', (v) => setDyadArp(v / 1000), arpLabel);
+    seg('dyad-arp-seg', (v) => setDyadArpOrder(v));
 
     /* ---- the pivot, over two voices ----
      * The same press the other two modes get, one row shorter. S and T are
@@ -1151,6 +1161,8 @@ export function setupUIEventListeners() {
     press('tetradGlide', 'tetrad-glide-v',
         (v) => setTetradGlide(v / 1000),
         (v) => (v >= 1000 ? `${(v / 1000).toFixed(2)} s` : `${Math.round(v)} ms`));
+    press('tetradArp', 'tetrad-arp-v', (v) => setTetradArp(v / 1000), arpLabel);
+    seg('tetrad-arp-seg', (v) => setTetradArpOrder(v));
 
     /* The field goes into the tetrahedron's scene now, while the slider it
        reports a sweep to exists — the scene itself has existed since

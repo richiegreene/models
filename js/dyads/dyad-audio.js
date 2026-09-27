@@ -22,7 +22,8 @@ import * as voice from '../synth/voice.js';
 import {
     initialBaseFreq, playbackMode, enableNotation, notationDisplay,
 } from '../globals.js';
-import { dyadGlide, dyadPivot } from './dyad-state.js';
+import { dyadGlide, dyadPivot, dyadArp, dyadArpOrder } from './dyad-state.js';
+import { onsets } from '../synth/arpeggio.js';
 import { updateNotationDisplay } from '../notation/notation-display.js';
 import {
     sendMpeNoteOn, sendMpePitchBendUpdate, releaseAllMpeNotes, isMpeNoteActive,
@@ -52,6 +53,11 @@ function offsets(c) {
 
 function frequencies(c) {
     return offsets(c).map((cents) => pivotFreq * Math.pow(2, cents / 1200));
+}
+
+/** When each voice comes in if this dyad is struck — see arpeggio.js. */
+function lags(freqs) {
+    return onsets(freqs, dyadArp, dyadArpOrder);
 }
 
 function gcd(a, b) { return b ? gcd(b, a % b) : Math.abs(a); }
@@ -92,20 +98,25 @@ export function spellDyad(c, tolerance = 4, maxLower = 256) {
  *  The three messages a gesture sends
  * ------------------------------------------------------------------ */
 
-/** Put the two voices down. The only attack in the whole drag. */
+/**
+ * Put the two voices down. The only attack in the whole drag — spread out,
+ * if Arpeggiate says so, with the moves that follow leading a voice that has
+ * not come in yet to where it will.
+ */
 export function dyadNoteOn(c, label) {
     const freqs = frequencies(c);
+    const lag = lags(freqs);
     lastFreqs = freqs;
 
     if (playbackMode === 'browser' || playbackMode === 'both') {
         voice.start();
-        freqs.forEach((f, i) => voice.noteOn(VOICE_IDS[i], f));
+        freqs.forEach((f, i) => voice.noteOn(VOICE_IDS[i], f, 1, lag[i]));
         sounding = true;
     }
     if (playbackMode === 'mpe-midi' || playbackMode === 'both') {
         freqs.forEach((f, i) => {
             if (isMpeNoteActive(i)) sendMpePitchBendUpdate(i, f);
-            else sendMpeNoteOn(i, f);
+            else sendMpeNoteOn(i, f, undefined, lag[i]);
         });
     }
 
@@ -134,6 +145,7 @@ export function dyadMove(c, label) {
 
 function flush(c, label) {
     const freqs = frequencies(c);
+    const lag = lags(freqs);
     lastFreqs = freqs;
 
     if (playbackMode === 'browser' || playbackMode === 'both') {
@@ -141,14 +153,14 @@ function flush(c, label) {
             freqs.forEach((f, i) => voice.glide(VOICE_IDS[i], f, dyadGlide));
         } else {
             voice.start();
-            freqs.forEach((f, i) => voice.noteOn(VOICE_IDS[i], f));
+            freqs.forEach((f, i) => voice.noteOn(VOICE_IDS[i], f, 1, lag[i]));
             sounding = true;
         }
     }
     if (playbackMode === 'mpe-midi' || playbackMode === 'both') {
         freqs.forEach((f, i) => {
             if (isMpeNoteActive(i)) sendMpePitchBendUpdate(i, f);
-            else sendMpeNoteOn(i, f);
+            else sendMpeNoteOn(i, f, undefined, lag[i]);
         });
     }
 

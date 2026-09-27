@@ -82,6 +82,54 @@ class Voice {
     this.glideTo = 0;
     this.glideStep = 0;
     this.glideLeft = 0;
+    /* What this voice has been told to do LATER — an arpeggiated chord's
+     * onsets, and the releases that follow them — as {at, on, freq, vel},
+     * in order, `at` on the processor's sample clock. `next` is the first
+     * one's time, Infinity when there is none, so the per-sample check is
+     * one compare, like the glide's. `lag` is how late this voice's last
+     * onset was, which its release is shifted by. */
+    this.queue = [];
+    this.next = Infinity;
+    this.lag = 0;
+  }
+
+  /**
+   * Put an onset or a release on this voice's timeline.
+   *
+   * A new onset supersedes everything planned from its moment on: those
+   * events belonged to a chord that has since been replaced, and left in
+   * they would re-strike this voice at the old pitch, or let go of the new
+   * note early. A release goes wherever its time says.
+   */
+  plan(e) {
+    const q = this.queue;
+    let k = q.length;
+    if (e.on) {
+      while (k > 0 && q[k - 1].at >= e.at) k--;
+      q.length = k;
+      q.push(e);
+    } else {
+      while (k > 0 && q[k - 1].at > e.at) k--;
+      q.splice(k, 0, e);
+    }
+    this.next = q[0].at;
+  }
+
+  /** Nothing planned any more — what an allOff and a stolen voice need. */
+  unplan() {
+    this.queue.length = 0;
+    this.next = Infinity;
+  }
+
+  /** Carry out whatever is due by sample `t`. */
+  fire(t) {
+    const q = this.queue;
+    while (q.length && q[0].at <= t) {
+      const e = q.shift();
+      if (e.on) this.on(this.id, e.freq, e.vel);
+      else this.off();
+    }
+    this.next = q.length ? q[0].at : Infinity;
   }
 
   on(id, freq, vel) {
@@ -160,6 +208,11 @@ class XenachordVoiceProcessor extends AudioWorkletProcessor {
     this.adsr = { a: 0.016, d: 0.120, s: 0.66, r: 0.544 };
     this.gain = 0.22;
     this.pole = Math.pow(0.5, 44100 / sampleRate); // synth.js FILTERED.pole
+    /* Samples rendered so far — the clock a delayed onset is timed on. Every
+     * message is handled between two blocks, so `clock` is then exactly the
+     * first sample of the next one, and a chord's notes, posted together,
+     * are all measured from the same instant. */
+    this.clock = 0;
     this.port.onmessage = (e) => this.handle(e.data);
     /* The node comes up already configured rather than waiting on its first
      * message: a port message is delivered on a later turn, so a note struck
@@ -183,23 +236,52 @@ class XenachordVoiceProcessor extends AudioWorkletProcessor {
         break;
       case 'on': {
         // One voice per key: the same key pressed again takes its own voice
-        // back rather than stacking a second copy on top of itself.
+        // back rather than stacking a second copy on top of itself. A voice
+        // with an onset still to come is not free, even though it is silent.
         let v = this.voices.find((q) => q.id === m.id)
-             || this.voices.find((q) => q.stage === DONE);
+             || this.voices.find((q) => q.stage === DONE && q.next === Infinity);
         if (!v) v = this.voices.reduce((lo, q) => (q.env < lo.env ? q : lo));
-        v.on(m.id, m.freq, m.vel ?? 1);
+        if (v.id !== m.id) v.unplan();
+        /* An arpeggiated note is struck `delay` seconds late, to the sample:
+         * timed here rather than by a timer on the page, where the models
+         * running on the same thread would make a spread of 40 ms anything
+         * from 40 to 400. Whatever this voice is still sounding carries on
+         * until then. */
+        const lag = Math.max(0, Math.round((m.delay || 0) * sampleRate));
+        v.lag = lag;
+        if (lag > 0) {
+          v.id = m.id;
+          v.plan({ at: this.clock + lag, on: true, freq: m.freq, vel: m.vel ?? 1 });
+        } else {
+          v.unplan();
+          v.on(m.id, m.freq, m.vel ?? 1);
+        }
         break;
       }
       case 'glide':
         for (const v of this.voices) {
-          if (v.id === m.id) v.slide(m.freq, Math.round((m.time || 0) * sampleRate));
+          if (v.id !== m.id) continue;
+          v.slide(m.freq, Math.round((m.time || 0) * sampleRate));
+          /* A note still waiting for its onset starts where the chord has
+           * got to by then, not where it was when it was struck. */
+          for (const e of v.queue) if (e.on) e.freq = m.freq;
         }
         break;
       case 'off':
-        for (const v of this.voices) if (v.id === m.id) v.off();
+        for (const v of this.voices) {
+          if (v.id !== m.id) continue;
+          /* Let go as late as the note was struck, so an arpeggiated note is
+           * held exactly as long as it would have been together and keeps its
+           * whole envelope — and never before its own onset, which would
+           * leave that onset with no release to follow it. */
+          let at = this.clock + v.lag;
+          for (const e of v.queue) if (e.on && e.at > at) at = e.at;
+          if (at <= this.clock) v.off();
+          else v.plan({ at, on: false });
+        }
         break;
       case 'allOff':
-        for (const v of this.voices) v.off();
+        for (const v of this.voices) { v.unplan(); v.off(); }
         break;
     }
   }
@@ -212,9 +294,14 @@ class XenachordVoiceProcessor extends AudioWorkletProcessor {
     const buf = out[0];
     buf.fill(0);
 
+    const t0 = this.clock;
     for (const v of this.voices) {
-      if (v.stage === DONE) continue;
+      if (v.stage === DONE && v.next === Infinity) continue;
 
+      /* Each sample first carries out anything due on the voice's timeline,
+       * then skips it while it is silent — a voice waiting on a late onset
+       * is counted through the block, not rendered. The pitch is re-read
+       * when an onset or a glide has moved it. */
       if (this.filtered) {
         /* Recomputed per sample only while the pitch is actually moving:
          * a standing voice keeps the hoisted values it always had. */
@@ -224,9 +311,15 @@ class XenachordVoiceProcessor extends AudioWorkletProcessor {
         const even = this.even;
         const pole = this.pole;
         for (let i = 0; i < n; i++) {
+          let retune = false;
+          if (t0 + i >= v.next) { v.fire(t0 + i); retune = true; }
+          if (v.stage === DONE) { if (v.next === Infinity) break; continue; }
           if (v.glideLeft > 0) {
             v.freq += v.glideStep;
             if (--v.glideLeft === 0) v.freq = v.glideTo;
+            retune = true;
+          }
+          if (retune) {
             step = (TWO_PI * v.freq) / sr;
             taper = filteredTaper(v.freq, sr);
             drive = this.drive * taper;
@@ -237,15 +330,20 @@ class XenachordVoiceProcessor extends AudioWorkletProcessor {
           const s = amp * Math.sin(v.accum + filteredIndex(v.pout, drive, even));
           v.pout = pole * v.pout + (1 - pole) * s;
           buf[i] += s;
-          if (v.stage === DONE) break;
         }
       } else if (this.mips) {
         let table = this.mips[mipFor(v.freq)];
         let inc = (v.freq * TABLE_SIZE) / sr;
         for (let i = 0; i < n; i++) {
+          let retune = false;
+          if (t0 + i >= v.next) { v.fire(t0 + i); retune = true; }
+          if (v.stage === DONE) { if (v.next === Infinity) break; continue; }
           if (v.glideLeft > 0) {
             v.freq += v.glideStep;
             if (--v.glideLeft === 0) v.freq = v.glideTo;
+            retune = true;
+          }
+          if (retune) {
             table = this.mips[mipFor(v.freq)];
             inc = (v.freq * TABLE_SIZE) / sr;
           }
@@ -257,10 +355,10 @@ class XenachordVoiceProcessor extends AudioWorkletProcessor {
           buf[i] += amp * (a + f * (b - a));
           v.phase += inc;
           if (v.phase >= TABLE_SIZE) v.phase -= TABLE_SIZE;
-          if (v.stage === DONE) break;
         }
       }
     }
+    this.clock += n;
 
     /* A soft knee rather than a hard ceiling: thirty-two keys held at once is
      * a chord somebody meant, and it should get quieter and thicker rather

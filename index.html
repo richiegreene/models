@@ -832,6 +832,23 @@
             </div>
           </fieldset>
 
+          <!-- ---- the arpeggiato signs ----
+               Drawn once, for the switch under Arpeggiate in all three modes'
+               Tracking. Bravura's own arpeggiatoUp and arpeggiatoDown (U+E634,
+               U+E635), cut to the arrowhead and three turns of the wiggle: at
+               full length the sign is six times taller than it is wide, and at
+               the height of a button that is a hairline. Random is the same
+               wiggle with an arrowhead at each end — SMuFL has no sign for it. -->
+          <svg width="0" height="0" style="position:absolute" aria-hidden="true">
+            <defs>
+              <clipPath id="arp-crop"><rect width="230" height="991"/></clipPath>
+              <clipPath id="arp-crop-short"><rect width="230" height="791"/></clipPath>
+            </defs>
+            <symbol id="arp-up" viewBox="0 0 230 991"><path clip-path="url(#arp-crop)" d="M152 228H229L114 0L1 228H84Q81 241 75 253Q69 265 64 276L62 280Q54 297 48 316Q41 335 41 353Q41 381 49 399Q56 418 67 431Q68 432 68 433Q69 434 69 434L71 437Q78 445 82 454Q86 462 86 472Q86 476 85 482Q82 497 76 510Q70 523 64 536Q56 553 49 573Q42 593 41 613Q41 643 51 664Q60 684 73 697Q80 706 83 713Q86 721 86 733L85 738Q85 738 85 740Q82 755 76 768Q70 781 64 794Q56 811 49 831Q42 851 41 871Q42 905 53 927Q64 949 80 961Q83 966 85 971Q86 976 86 983Q86 988 85 994Q82 1009 76 1022Q70 1035 64 1048Q56 1065 49 1085Q42 1105 41 1125Q41 1156 51 1177Q61 1197 75 1210Q80 1217 83 1224Q86 1231 86 1241Q86 1243 86 1246Q86 1249 85 1251Q82 1266 76 1279Q70 1291 64 1304L62 1308Q54 1325 48 1344Q41 1363 41 1382Q44 1439 71 1463Q98 1488 113 1498Q119 1504 123 1504Q127 1504 129 1500Q131 1496 131 1491Q131 1484 128 1478Q123 1467 119 1457Q116 1447 116 1432Q119 1401 138 1378Q157 1354 160 1299Q160 1272 150 1252Q141 1231 126 1217Q121 1208 119 1198Q116 1188 116 1175Q119 1145 138 1121Q157 1097 160 1042Q160 1014 149 993Q139 972 124 958Q120 950 118 941Q116 933 116 921Q119 891 138 867Q157 844 160 789Q160 762 150 742Q141 721 127 707Q122 697 119 687Q116 677 116 664Q119 633 138 609Q157 586 160 531Q160 505 151 485Q142 465 129 451Q124 447 120 429Q116 411 116 404Q119 373 138 350Q157 326 160 271Q160 247 152 228Z"/></symbol>
+            <symbol id="arp-down" viewBox="0 0 230 991"><path clip-path="url(#arp-crop)" d="M152 763Q160 744 160 720Q157 665 138 641Q119 618 116 587Q116 580 120 562Q124 544 129 540Q142 526 151 506Q160 486 160 460Q157 405 138 381Q119 358 116 327Q116 314 119 304Q122 294 127 284Q141 270 150 249Q160 229 160 202Q157 147 138 124Q119 100 116 70Q116 58 118 50Q120 41 124 33Q139 19 149 -2Q160 -23 160 -51Q157 -106 138 -130Q119 -154 116 -184Q116 -197 119 -207Q121 -217 126 -226Q141 -240 150 -261Q160 -281 160 -308Q157 -363 138 -387Q119 -410 116 -441Q116 -456 119 -466Q123 -476 128 -487Q131 -494 131 -500Q131 -505 129 -509Q127 -513 123 -513Q119 -513 113 -507Q98 -497 71 -472Q44 -448 41 -391Q41 -372 48 -353Q54 -334 62 -317L64 -313Q70 -300 76 -288Q82 -275 85 -260Q86 -258 86 -255Q86 -252 86 -250Q86 -240 83 -233Q80 -226 75 -219Q61 -206 51 -186Q41 -165 41 -134Q42 -114 49 -94Q56 -74 64 -57Q70 -44 76 -31Q82 -18 85 -3Q86 3 86 8Q86 15 85 20Q83 25 80 30Q64 42 53 64Q42 86 41 120Q42 140 49 160Q56 180 64 197Q70 210 76 223Q82 236 85 251Q85 252 85 253L86 258Q86 270 83 277Q80 285 73 294Q60 307 51 327Q41 348 41 378Q42 398 49 418Q56 438 64 455Q70 468 76 481Q82 494 85 509Q86 515 86 519Q86 529 82 537Q78 546 71 554L69 557Q69 557 68 558Q68 559 67 560Q56 573 49 591Q41 610 41 638Q41 656 48 675Q54 694 62 711L64 715Q69 726 75 738Q81 750 84 763H1L114 991L229 763Z"/></symbol>
+            <symbol id="arp-random" viewBox="0 0 230 991"><path clip-path="url(#arp-crop-short)" d="M152 228H229L114 0L1 228H84Q81 241 75 253Q69 265 64 276L62 280Q54 297 48 316Q41 335 41 353Q41 381 49 399Q56 418 67 431Q68 432 68 433Q69 434 69 434L71 437Q78 445 82 454Q86 462 86 472Q86 476 85 482Q82 497 76 510Q70 523 64 536Q56 553 49 573Q42 593 41 613Q41 643 51 664Q60 684 73 697Q80 706 83 713Q86 721 86 733L85 738Q85 738 85 740Q82 755 76 768Q70 781 64 794Q56 811 49 831Q42 851 41 871Q42 905 53 927Q64 949 80 961Q83 966 85 971Q86 976 86 983Q86 988 85 994Q82 1009 76 1022Q70 1035 64 1048Q56 1065 49 1085Q42 1105 41 1125Q41 1156 51 1177Q61 1197 75 1210Q80 1217 83 1224Q86 1231 86 1241Q86 1243 86 1246Q86 1249 85 1251Q82 1266 76 1279Q70 1291 64 1304L62 1308Q54 1325 48 1344Q41 1363 41 1382Q44 1439 71 1463Q98 1488 113 1498Q119 1504 123 1504Q127 1504 129 1500Q131 1496 131 1491Q131 1484 128 1478Q123 1467 119 1457Q116 1447 116 1432Q119 1401 138 1378Q157 1354 160 1299Q160 1272 150 1252Q141 1231 126 1217Q121 1208 119 1198Q116 1188 116 1175Q119 1145 138 1121Q157 1097 160 1042Q160 1014 149 993Q139 972 124 958Q120 950 118 941Q116 933 116 921Q119 891 138 867Q157 844 160 789Q160 762 150 742Q141 721 127 707Q122 697 119 687Q116 677 116 664Q119 633 138 609Q157 586 160 531Q160 505 151 485Q142 465 129 451Q124 447 120 429Q116 411 116 404Q119 373 138 350Q157 326 160 271Q160 247 152 228Z"/><path d="M1 763H229L114 991Z"/></symbol>
+          </svg>
+
           <!-- ---- following the hand ----
                Triads only, and the whole difference from the app this mode
                comes from. There, every pointer move builds a new buffer and
@@ -850,6 +867,21 @@
             </div>
             <input type="range" id="triadGlide" min="0" max="400" step="1" value="45"
               title="How long a voice takes to reach the pitch under the pointer. The attack happens once, when the pointer goes down; this is only how the three voices travel afterwards.">
+            <!-- Arpeggiate spreads the strike out: each voice comes in this
+                 long after the one before, with the whole envelope it would
+                 have had struck together, and one not in yet enters wherever
+                 the pointer has got to — see arpeggio.js. -->
+            <div class="pressrow">
+              <label for="triadArp">Arpeggiate</label>
+              <span class="pressval" id="triad-arp-v">off</span>
+            </div>
+            <input type="range" id="triadArp" min="0" max="1000" step="1" value="0"
+              title="How far apart the three voices come in when a chord is struck. At 0 they sound together; above it each comes in that long after the one before, with its own full envelope. A voice not yet in enters at the pitch under the pointer, so you can keep sliding while the chord rolls in.">
+            <div class="seg arp-seg" id="triad-arp-seg">
+              <button data-v="up" class="on" title="Arpeggiato up — the lowest voice first."><svg class="arp-glyph" viewBox="0 0 230 991" aria-hidden="true"><use href="#arp-up"/></svg>Up</button>
+              <button data-v="down" title="Arpeggiato down — the highest voice first."><svg class="arp-glyph" viewBox="0 0 230 991" aria-hidden="true"><use href="#arp-down"/></svg>Down</button>
+              <button data-v="random" title="Arpeggiato in a fresh random order on every strike."><svg class="arp-glyph" viewBox="0 0 230 991" aria-hidden="true"><use href="#arp-random"/></svg>Random</button>
+            </div>
           </fieldset>
 
           <!-- The same setting over two voices, and its own rather than
@@ -864,6 +896,21 @@
             </div>
             <input type="range" id="dyadGlide" min="0" max="400" step="1" value="45"
               title="How long a voice takes to reach the pitch under the pointer. The attack happens once, when the pointer goes down; this is only how the two voices travel afterwards.">
+            <!-- Arpeggiate spreads the strike out: each voice comes in this
+                 long after the one before, with the whole envelope it would
+                 have had struck together, and one not in yet enters wherever
+                 the pointer has got to — see arpeggio.js. -->
+            <div class="pressrow">
+              <label for="dyadArp">Arpeggiate</label>
+              <span class="pressval" id="dyad-arp-v">off</span>
+            </div>
+            <input type="range" id="dyadArp" min="0" max="1000" step="1" value="0"
+              title="How far apart the two voices come in when a chord is struck. At 0 they sound together; above it each comes in that long after the one before, with its own full envelope. A voice not yet in enters at the pitch under the pointer, so you can keep sliding while the chord rolls in.">
+            <div class="seg arp-seg" id="dyad-arp-seg">
+              <button data-v="up" class="on" title="Arpeggiato up — the lower voice first."><svg class="arp-glyph" viewBox="0 0 230 991" aria-hidden="true"><use href="#arp-up"/></svg>Up</button>
+              <button data-v="down" title="Arpeggiato down — the upper voice first."><svg class="arp-glyph" viewBox="0 0 230 991" aria-hidden="true"><use href="#arp-down"/></svg>Down</button>
+              <button data-v="random" title="Arpeggiato in a fresh random order on every strike."><svg class="arp-glyph" viewBox="0 0 230 991" aria-hidden="true"><use href="#arp-random"/></svg>Random</button>
+            </div>
           </fieldset>
 
           <!-- Over four voices, for the cut through the entropy field: a
@@ -879,6 +926,23 @@
             </div>
             <input type="range" id="tetradGlide" min="0" max="400" step="1" value="45"
               title="How long a voice takes to reach the pitch under the pointer while a cut is being played. The attack happens once, when the pointer goes down on the cut; this is only how the four voices travel afterwards.">
+            <!-- Arpeggiate spreads the strike out: each voice comes in this
+                 long after the one before, with the whole envelope it would
+                 have had struck together, and one not in yet enters wherever
+                 the pointer has got to — see arpeggio.js.
+                 Unlike Portamento it is not the cut's alone: a hovered point
+                 is struck the same way. -->
+            <div class="pressrow">
+              <label for="tetradArp">Arpeggiate</label>
+              <span class="pressval" id="tetrad-arp-v">off</span>
+            </div>
+            <input type="range" id="tetradArp" min="0" max="1000" step="1" value="0"
+              title="How far apart the four voices come in when a chord is struck. At 0 they sound together; above it each comes in that long after the one before, with its own full envelope. A voice not yet in enters at the pitch under the pointer, so you can keep sliding while the chord rolls in.">
+            <div class="seg arp-seg" id="tetrad-arp-seg">
+              <button data-v="up" class="on" title="Arpeggiato up — the lowest voice first."><svg class="arp-glyph" viewBox="0 0 230 991" aria-hidden="true"><use href="#arp-up"/></svg>Up</button>
+              <button data-v="down" title="Arpeggiato down — the highest voice first."><svg class="arp-glyph" viewBox="0 0 230 991" aria-hidden="true"><use href="#arp-down"/></svg>Down</button>
+              <button data-v="random" title="Arpeggiato in a fresh random order on every strike."><svg class="arp-glyph" viewBox="0 0 230 991" aria-hidden="true"><use href="#arp-random"/></svg>Random</button>
+            </div>
           </fieldset>
 
           <!-- Keyboard Designer's Play drawer, on the same terms: the family list and

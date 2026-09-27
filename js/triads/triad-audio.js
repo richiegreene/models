@@ -38,8 +38,9 @@ import {
     initialBaseFreq, playbackMode, enableNotation, notationDisplay,
 } from '../globals.js';
 import {
-    triadGlide, triadPivot,
+    triadGlide, triadPivot, triadArp, triadArpOrder,
 } from './triad-state.js';
+import { onsets } from '../synth/arpeggio.js';
 import { updateNotationDisplay } from '../notation/notation-display.js';
 import {
     sendMpeNoteOn, sendMpeNoteOff, sendMpePitchBendUpdate, releaseAllMpeNotes,
@@ -79,6 +80,11 @@ function offsets(c1, c2) {
 
 function frequencies(c1, c2) {
     return offsets(c1, c2).map((cents) => pivotFreq * Math.pow(2, cents / 1200));
+}
+
+/** When each voice comes in if this triad is struck — see arpeggio.js. */
+function lags(freqs) {
+    return onsets(freqs, triadArp, triadArpOrder);
 }
 
 function gcd(a, b) { return b ? gcd(b, a % b) : Math.abs(a); }
@@ -134,20 +140,25 @@ export function spellTriad(c1, c2, tolerance = 4, maxBass = 96) {
  *  The three messages a gesture sends
  * ------------------------------------------------------------------ */
 
-/** Put the three voices down. The only attack in the whole drag. */
+/**
+ * Put the three voices down. The only attack in the whole drag — spread out,
+ * if Arpeggiate says so, with the moves that follow leading a voice that has
+ * not come in yet to where it will.
+ */
 export function triadNoteOn(c1, c2, label) {
     const freqs = frequencies(c1, c2);
+    const lag = lags(freqs);
     lastFreqs = freqs;
 
     if (playbackMode === 'browser' || playbackMode === 'both') {
         voice.start();
-        freqs.forEach((f, i) => voice.noteOn(VOICE_IDS[i], f));
+        freqs.forEach((f, i) => voice.noteOn(VOICE_IDS[i], f, 1, lag[i]));
         sounding = true;
     }
     if (playbackMode === 'mpe-midi' || playbackMode === 'both') {
         freqs.forEach((f, i) => {
             if (isMpeNoteActive(i)) sendMpePitchBendUpdate(i, f);
-            else sendMpeNoteOn(i, f);
+            else sendMpeNoteOn(i, f, undefined, lag[i]);
         });
     }
 
@@ -177,6 +188,7 @@ export function triadMove(c1, c2, label) {
 
 function flush(c1, c2, label) {
     const freqs = frequencies(c1, c2);
+    const lag = lags(freqs);
     lastFreqs = freqs;
 
     if (playbackMode === 'browser' || playbackMode === 'both') {
@@ -184,14 +196,14 @@ function flush(c1, c2, label) {
             freqs.forEach((f, i) => voice.glide(VOICE_IDS[i], f, triadGlide));
         } else {
             voice.start();
-            freqs.forEach((f, i) => voice.noteOn(VOICE_IDS[i], f));
+            freqs.forEach((f, i) => voice.noteOn(VOICE_IDS[i], f, 1, lag[i]));
             sounding = true;
         }
     }
     if (playbackMode === 'mpe-midi' || playbackMode === 'both') {
         freqs.forEach((f, i) => {
             if (isMpeNoteActive(i)) sendMpePitchBendUpdate(i, f);
-            else sendMpeNoteOn(i, f);
+            else sendMpeNoteOn(i, f, undefined, lag[i]);
         });
     }
 

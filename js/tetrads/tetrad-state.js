@@ -88,6 +88,17 @@ export let tetradGlide = 0.045;
 export function setTetradGlide(v) { tetradGlide = v; }
 
 /**
+ * How far apart the four voices come in when a tetrad is struck, in seconds —
+ * 0 is all at once — and in which order. Unlike Portamento this belongs to
+ * both gestures: a hovered point and a cut are struck the same way. See
+ * arpeggio.js.
+ */
+export let tetradArp = 0;
+export let tetradArpOrder = 'up'; // 'up' | 'down' | 'random'
+export function setTetradArp(v) { tetradArp = v; }
+export function setTetradArpOrder(v) { tetradArpOrder = v; }
+
+/**
  * Where the pointer is on the cut, as the three intervals in cents.
  *
  * One cursor: the cut writes it on a drag, the bead is drawn from it, and

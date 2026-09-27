@@ -115,6 +115,15 @@ export function setTriadSnap(v) { triadSnap = v; }
 export let triadGlide = 0.045;
 export function setTriadGlide(v) { triadGlide = v; }
 
+/**
+ * How far apart the three voices come in when a triad is struck, in seconds —
+ * 0 is all at once — and in which order. See arpeggio.js.
+ */
+export let triadArp = 0;
+export let triadArpOrder = 'up'; // 'up' | 'down' | 'random'
+export function setTriadArp(v) { triadArp = v; }
+export function setTriadArpOrder(v) { triadArpOrder = v; }
+
 /** Which of the three voices is held while the other two move. 0 = lowest. */
 export let triadPivot = 0;
 export function setTriadPivot(v) { triadPivot = v; }

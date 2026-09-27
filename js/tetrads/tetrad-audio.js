@@ -27,7 +27,8 @@ import {
     currentPivotVoiceIndex, lastPlayedFrequencies,
     setLastPlayedFrequencies, setLastPlayedRatios,
 } from '../globals.js';
-import { tetradGlide } from './tetrad-state.js';
+import { tetradGlide, tetradArp, tetradArpOrder } from './tetrad-state.js';
+import { onsets } from '../synth/arpeggio.js';
 import { updateNotationDisplay } from '../notation/notation-display.js';
 import {
     sendMpeNoteOn, sendMpePitchBendUpdate, releaseAllMpeNotes, isMpeNoteActive,
@@ -58,6 +59,11 @@ function offsets(c1, c2, c3) {
 
 function frequencies(c1, c2, c3) {
     return offsets(c1, c2, c3).map((cents) => pivotFreq * Math.pow(2, cents / 1200));
+}
+
+/** When each voice comes in if this tetrad is struck — see arpeggio.js. */
+function lags(freqs) {
+    return onsets(freqs, tetradArp, tetradArpOrder);
 }
 
 function gcd(a, b) { return b ? gcd(b, a % b) : Math.abs(a); }
@@ -116,17 +122,18 @@ export function tetradNoteOn(c1, c2, c3, label) {
         pivotFreq = prev[currentPivotVoiceIndex];
     }
     const freqs = frequencies(c1, c2, c3);
+    const lag = lags(freqs);
     lastFreqs = freqs;
 
     if (playbackMode === 'browser' || playbackMode === 'both') {
         voice.start();
-        freqs.forEach((f, i) => voice.noteOn(VOICE_IDS[i], f));
+        freqs.forEach((f, i) => voice.noteOn(VOICE_IDS[i], f, 1, lag[i]));
         sounding = true;
     }
     if (playbackMode === 'mpe-midi' || playbackMode === 'both') {
         freqs.forEach((f, i) => {
             if (isMpeNoteActive(i)) sendMpePitchBendUpdate(i, f);
-            else sendMpeNoteOn(i, f);
+            else sendMpeNoteOn(i, f, undefined, lag[i]);
         });
     }
 
@@ -150,6 +157,7 @@ export function tetradMove(c1, c2, c3, label) {
 
 function flush(c1, c2, c3, label) {
     const freqs = frequencies(c1, c2, c3);
+    const lag = lags(freqs);
     lastFreqs = freqs;
 
     if (playbackMode === 'browser' || playbackMode === 'both') {
@@ -157,14 +165,14 @@ function flush(c1, c2, c3, label) {
             freqs.forEach((f, i) => voice.glide(VOICE_IDS[i], f, tetradGlide));
         } else {
             voice.start();
-            freqs.forEach((f, i) => voice.noteOn(VOICE_IDS[i], f));
+            freqs.forEach((f, i) => voice.noteOn(VOICE_IDS[i], f, 1, lag[i]));
             sounding = true;
         }
     }
     if (playbackMode === 'mpe-midi' || playbackMode === 'both') {
         freqs.forEach((f, i) => {
             if (isMpeNoteActive(i)) sendMpePitchBendUpdate(i, f);
-            else sendMpeNoteOn(i, f);
+            else sendMpeNoteOn(i, f, undefined, lag[i]);
         });
     }
 

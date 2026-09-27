@@ -26,6 +26,8 @@ import { updateNotationDisplay } from '../notation/notation-display.js';
 import { notationDisplay, enableNotation } from '../globals.js';
 import { sendMpeNoteOn, sendMpeNoteOff, sendMpePitchBendUpdate, releaseAllMpeNotes, isMpeNoteActive } from '../midi/midi-output.js';
 import * as voice from '../synth/voice.js';
+import { tetradArp, tetradArpOrder } from '../tetrads/tetrad-state.js';
+import { onsets } from '../synth/arpeggio.js';
 
 /** The four parts, bottom to top — the ids every message is addressed to. */
 const VOICE_IDS = [0, 1, 2, 3];
@@ -71,6 +73,9 @@ export function playChord(ratioString) {
     }
 
     const frequencies = ratio.map(r => effectiveBaseFreq * (r / ratio[0]));
+    /* Only a strike is arpeggiated; a slide to the next point is a glide and
+       has no onsets to spread. See arpeggio.js. */
+    const lag = onsets(frequencies, tetradArp, tetradArpOrder);
 
     // --- Handle Browser Audio Playback ---
     if (playbackMode === 'browser' || playbackMode === 'both') {
@@ -78,7 +83,7 @@ export function playChord(ratioString) {
         if (enableSlide && sounding) {
             frequencies.forEach((freq, i) => voice.glide(VOICE_IDS[i], freq, slideDuration));
         } else {
-            frequencies.forEach((freq, i) => voice.noteOn(VOICE_IDS[i], freq));
+            frequencies.forEach((freq, i) => voice.noteOn(VOICE_IDS[i], freq, 1, lag[i]));
         }
         sounding = true;
     } else if (sounding) {
@@ -111,7 +116,7 @@ export function playChord(ratioString) {
             if (previousActiveIndices.has(index)) {
                 sendMpePitchBendUpdate(index, freq);
             } else {
-                sendMpeNoteOn(index, freq);
+                sendMpeNoteOn(index, freq, undefined, lag[index]);
             }
         });
 
@@ -135,10 +140,14 @@ export function playChord(ratioString) {
  * fade now, so the flag is kept for its callers and means what it always
  * meant — the note is over — with the shape of the ending coming from the
  * ADSR editor rather than from here.
+ *
+ * Voice by voice rather than allOff, so an arpeggiated chord lets go in the
+ * order it came in — each note as late as it was struck — and a quick hover
+ * still hears the entrances it has not reached yet.
  */
 export function stopChord(immediate = false) {
     if (sounding) {
-        voice.allOff();
+        VOICE_IDS.forEach((id) => voice.noteOff(id));
         sounding = false;
     }
 

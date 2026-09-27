@@ -288,6 +288,12 @@ button.latched{background:#24405c;border-color:var(--accent);color:#cfe6ff}
 /* Six readouts do not fit one row legibly, so this one is allowed to wrap and
    every button keeps its own corners rather than pretending to be a strip. */
 .seg.wrap button{flex:1 1 30%;border-left-width:1px;border-radius:6px;margin:0 3px 3px 0}
+/* The arpeggiato switch: the sign beside the word, in the button's own colour
+   so it lights and hovers with it. The signs are drawn once in the Play
+   drawer's markup and used from there. */
+.arp-seg{margin-top:6px}
+.arp-seg button{display:flex;align-items:center;justify-content:center;gap:5px;padding:3px 6px}
+.arp-glyph{flex:none;width:5px;height:21px;fill:currentColor}
 
 /* ---------- stacked action buttons ----------
    The reference app's Export idiom: a grid of full-width presses, each one
