@@ -211,7 +211,7 @@ The gear under Export: where the in-browser synth is heard, and which part goes 
 * All outputs come from one audio clock, so the parts stay sample-locked to each other, and a doubled part is the same samples on both outputs.
 
 ## Full screen
-The button at the foot of the rail opens the view alone in a window of its own, for a projector: whatever the stage is showing and the notation readout over it, live and scaled to fill the window, with no panel and no pointer. This window keeps every control, so the performer plays here and the room sees only the picture.
+**Mirror the View**, at the foot of the Display drawer, opens the view alone in a window of its own, for a projector: whatever the stage is showing and the notation readout over it, live and scaled to fill the window, with no panel and no pointer. This window keeps every control, so the performer plays here and the room sees only the picture.
 * With the projector attached as a second display (extended, not mirrored), Chrome can put the window straight onto it at that screen's size, once the page is allowed to manage windows. Otherwise it opens beside the app and can be dragged across.
 * Click it there to fill the screen; Esc leaves full screen. The button is lit while the mirror is open, and pressing it again shuts it.
 * Keys pressed while the mirror has the focus — ⇧, S A T B, the arrows — are handed on to the app, so playing carries on after the click that filled the screen.

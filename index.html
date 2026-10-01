@@ -105,19 +105,6 @@
           <path d="M5.65 5.65l1.85 1.85M18.5 18.5l1.85 1.85M20.35 5.65L18.5 7.5M7.5 18.5l-1.85 1.85" />
         </svg>
       </button>
-      <!-- ---- full screen ----
-           The view alone, for a projector: a second window holding a live copy
-           of the stage and its readout, with no panel and no pointer. Lit
-           while it is open; pressed again, it shuts it. Last in the rail with
-           the other switches that are about the whole window rather than a
-           drawer — see mirror.js. -->
-      <button class="rail-btn" id="mirror-toggle" aria-pressed="false"
-        title="Full screen — the view alone in a window of its own, for a projector: no panel, no pointer. Click that window to fill its screen.">
-        <svg class="rail-icon" viewBox="0 0 26 26" fill="none" stroke="currentColor"
-          stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-          <path d="M4 9.5V4h5.5M16.5 4H22v5.5M22 16.5V22h-5.5M9.5 22H4v-5.5" />
-        </svg>
-      </button>
     </div>
 
     <div class="panel-body">
@@ -784,6 +771,22 @@
               title="How far one press of an arrow key turns the shape, and how fast it turns on its own.">
             <button id="autoRotate"
               title="Keep the shape turning. While it runs, the arrow keys steer it rather than nudging it.">&#8635; Rotate Continuously</button>
+          </fieldset>
+
+          <!-- ---- full screen ----
+               The view alone, for a projector: a second window holding a live
+               copy of the stage and its readout, with no panel and no pointer,
+               while this window keeps every control. Lit while it is open;
+               pressed again, it shuts it. Last in Display, because it is the
+               view itself leaving for another screen. See mirror.js. -->
+          <fieldset>
+            <legend>Full Screen</legend>
+            <button id="mirror-toggle" aria-pressed="false"
+              title="The view alone in a window of its own, for a projector: no panel, no pointer. Click that window to fill its screen; press here again to close it.">
+              <svg viewBox="0 0 26 26" fill="none" stroke="currentColor"
+                stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="M4 9.5V4h5.5M16.5 4H22v5.5M22 16.5V22h-5.5M9.5 22H4v-5.5" />
+              </svg>Mirror the View</button>
           </fieldset>
         </div>
 

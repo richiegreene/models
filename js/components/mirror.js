@@ -2,9 +2,9 @@
  *  FULL SCREEN — the view in a window of its own
  * =====================================================================
  *
- * The button at the foot of the rail. It opens mirror.html: the stage and its
- * readout, copied live and scaled to fill a window with no panel and no
- * pointer, for a projector. This window is left alone — the performer keeps
+ * The button at the foot of the Display drawer. It opens mirror.html: the
+ * stage and its readout, copied live and scaled to fill a window with no
+ * panel and no pointer, for a projector. This window is left alone — the performer keeps
  * the drawers, the pointer and every control, and the room sees only what is
  * being played.
  *
@@ -31,9 +31,13 @@ const $ = (id) => document.getElementById(id);
 /** The mirror, while there is one. */
 let mirror = null;
 
+/** Latched while the mirror is open, as Rotate Continuously is while it turns. */
 function light() {
     const open = !!mirror && !mirror.closed;
-    $('mirror-toggle')?.setAttribute('aria-pressed', String(open));
+    const btn = $('mirror-toggle');
+    if (!btn) return;
+    btn.classList.toggle('latched', open);
+    btn.setAttribute('aria-pressed', String(open));
 }
 
 /**
