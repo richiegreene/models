@@ -7,7 +7,7 @@ Sounds, shapes, colors ... Go nuts! Approaching this as a sort of 3D take off of
 ## Demo
 ![display demo](https://github.com/user-attachments/assets/4247d114-28db-4907-9da5-dc5b3bece989)
 
-The panel is a side rail of four modes — Complexity Measures, Display, Play and Export — borrowed, along with the synth and the JI notation engines, from [Keyboard Designer](https://github.com/richiegreene/keyboards). Pressing the mode you are already in shuts the drawer and gives the width back to the view.
+The panel is a side rail of five drawers — Complexity Measures, Display, Play, Export and Settings — borrowed, along with the synth and the JI notation engines, from [Keyboard Designer](https://github.com/richiegreene/keyboards). Pressing the mode you are already in shuts the drawer and gives the width back to the view.
 
 **Nothing needs applying.** There is no Update and no Generate: every control in every drawer applies itself a beat after you stop moving it. The wait is deliberate — the models run in Python, on the page's own thread, so recomputing on every intermediate value of a drag would freeze the slider being dragged. What used to be the Update button is now the line at the foot of the panel saying what came of it: how many chords are in the set, which model is under the triangle, and what it cost.
 
@@ -196,6 +196,18 @@ What the camera is looking at, at the size of the viewport, with anything outsid
 ### Data
 * Save Chords (.csv): ⇧⌘S
   * Enumerated Chords ($a:b:c:d$), Notes ($\dfrac{n}{d}$), Cents, and Complexity — sorted simplest first.
+
+## Settings
+The gear under Export: where the in-browser synth is heard, and which part goes to which output — for sending each voice of the chord to a different player's in-ear monitor.
+* **Device** — System Output, or any output device the browser lists (Chrome; Safari plays through the system output only). The number beside it is how many channels the browser can open on that device. Browsers name their devices only once the page may use an input, so the first time, **Show All Devices** asks for the microphone, closes it at once and records nothing. The choice is remembered, and an unplugged device is picked up again when it comes back.
+* **Routing**
+  * **Stereo Mix** — every part in both channels, as the app has always played
+  * **Split Stereo** — each side of each stereo pair its own mono feed (1 L, 1 R, 2 L, 2 R …), for a rig that takes each pair apart into two
+  * **Multichannel** — each output of a multichannel interface its own mono feed, numbered as the interface numbers them
+* **Outputs** — one row per output (up to eight), one key per part of the mode that is up: the lit keys are what that output carries. A part can be lit on several outputs and an output can carry several parts. Each mode keeps its own rows, so a dyad's routing does not disturb a tetrad's.
+  * **Double Parts** gives every silent output a part by repeating the outputs above it in order — a dyad on four outputs becomes S T S T, so every player has a line
+  * **One Each** puts it back to one part per output, top voice first
+* All outputs come from one audio clock, so the parts stay sample-locked to each other, and a doubled part is the same samples on both outputs.
 
 ## Harmonic entropy
 One statement of the model serves the three modes: it is written to Pyodide as `he_core.py` (source in [js/he/he-python.js](js/he/he-python.js)), and each mode's generator does only what is particular to its dimension — which chords are in the basis set, and where they land on the grid. Sources: the Xenharmonic Wiki's [Harmonic entropy](https://en.xen.wiki/w/Harmonic_entropy) (Erlich; the convolution form and the Rényi generalisation by Battaglia), Mike Battaglia's [HE-JS](http://www.mikebattagliamusic.com/HE-JS/HE.html) calculator, and Sintel's [harmonic_entropy_triads.ipynb](https://gist.github.com/Sin-tel/8d1a55a0e34ca159ac6aa61e325648d2).

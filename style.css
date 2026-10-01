@@ -295,6 +295,22 @@ button.latched{background:#24405c;border-color:var(--accent);color:#cfe6ff}
 .arp-seg button{display:flex;align-items:center;justify-content:center;gap:5px;padding:3px 6px}
 .arp-glyph{flex:none;width:5px;height:21px;fill:currentColor}
 
+/* ---------- the output rows ----------
+   Settings › Outputs: the output's name, then the parts as a segmented strip.
+   A strip because it is the panel's one way of saying "this is the one that
+   is true", and here it says it of each part an output carries — several may
+   be lit at once. A stereo pair's two rows sit together, with the gap after
+   the pair rather than after every row. */
+.route-row{display:flex;align-items:center;gap:8px}
+.route-row .seg{flex:1;margin:0 0 4px}
+.route-row.pair-end .seg{margin-bottom:9px}
+.route-out{flex:0 0 30px;color:var(--dim);font-size:11px;
+  font-variant-numeric:tabular-nums;white-space:nowrap}
+#out-routing .btns{margin-top:6px}
+/* Three words of different lengths across 230px: sized to what they say
+   rather than to a third each, so "Multichannel" is not "Multichan…". */
+#out-layout button{flex:1 1 auto;padding:4px 4px}
+
 /* ---------- stacked action buttons ----------
    The reference app's Export idiom: a grid of full-width presses, each one
    saying what it saves and in what. */

@@ -2,9 +2,9 @@
  *  THE SOUNDING END
  * =====================================================================
  *
- * One AudioContext, one worklet node, and the pair of numbers the worklet
- * needs kept up to date: which shape it is folding or reading, and what the
- * envelope is. Everything expensive — the eleven band-limited tables — is
+ * One AudioContext, one worklet node, and what the worklet needs kept up to
+ * date: which shape it is folding or reading, what the envelope is, and which
+ * output each part leaves by. Everything expensive — the eleven band-limited tables — is
  * built here on the main thread and posted across, because the audio thread
  * has 128 samples to fill and no business doing additive synthesis inside
  * them.
@@ -23,18 +23,32 @@ let ready = null;          // the promise the worklet module is loading on
 let timbre = FILTERED_MIN + 200;   // filtered saw
 let adsr = { a: 0.016, d: 0.120, s: 0.66, r: 0.544 };
 
+/**
+ * HOW MANY OUTPUTS THE NODE HAS — always this many, whatever it is plugged
+ * into. A worklet's channel count is fixed when it is built, and rebuilding
+ * it would cut off whatever is sounding, so it is built wide once and the
+ * destination decides how many of the channels actually leave: set to two it
+ * keeps the first two and drops the rest, which is the stereo mix exactly as
+ * it always was.
+ */
+export const MAX_OUTPUTS = 8;
+
+/** Which parts each output carries — see the worklet's `masks`. Null: all. */
+let masks = null;
+
 /** Bring the audio up, once, on a gesture. Safe to call on every key. */
 export function start() {
   if (ready) return ready;
   const AC = window.AudioContext || window.webkitAudioContext;
   if (!AC) return (ready = Promise.reject(new Error('no Web Audio')));
   ctx = new AC();
+  configureDestination();
   /* Synchronously, while the gesture that called this is still on the stack —
      see resumeNow. */
   resumeNow();
   ready = ctx.audioWorklet.addModule('js/synth/voice-processor.js').then(() => {
     node = new AudioWorkletNode(ctx, 'xenachord-voice', {
-      outputChannelCount: [2],
+      outputChannelCount: [MAX_OUTPUTS],
       // Configured at construction, so the first key cannot beat the first
       // message across the port — see the processor's constructor.
       processorOptions: { setup: setup() },
@@ -195,6 +209,7 @@ function setup() {
     msgs.push({ t: 'tables', mips: wavetablesFor(timbre, ctx.sampleRate).map((t) => t.slice()) });
   }
   msgs.push({ t: 'adsr', ...adsr });
+  msgs.push({ t: 'route', masks });
   return msgs;
 }
 
@@ -212,6 +227,67 @@ export function setTimbre(v) {
 export function setAdsr(next) {
   adsr = { ...adsr, ...next };
   if (node) node.port.postMessage({ t: 'adsr', ...adsr });
+}
+
+/* =====================================================================
+ *  WHERE THE SOUND GOES
+ * =====================================================================
+ *
+ * Parts to outputs, so each player's in-ear feed carries that player's line.
+ * One context and one node for all of them: the outputs share a sample clock,
+ * so four parts on four channels stay as together as one chord in two.
+ * ------------------------------------------------------------------ */
+
+/**
+ * Route the parts. `next` holds one mask per output, a bit per part — bit 0
+ * the lowest voice — or is null for the stereo mix, every part on both sides.
+ */
+export function setRouting(next) {
+  masks = next ? next.slice(0, MAX_OUTPUTS) : null;
+  configureDestination();
+  if (node) node.port.postMessage({ t: 'route', masks });
+}
+
+/**
+ * Open as many of the device's channels as the routing addresses, each one
+ * its own. 'discrete' is what keeps output 3 on output 3: the default,
+ * 'speakers', would read four channels as quad and fold them down to two.
+ * Asked again after a device change, because the count is the device's.
+ */
+function configureDestination() {
+  if (!ctx) return;
+  const d = ctx.destination;
+  const want = masks ? masks.length : 2;
+  const n = Math.max(1, Math.min(want, d.maxChannelCount || 2));
+  try {
+    d.channelInterpretation = 'discrete';
+    if (d.channelCount !== n) d.channelCount = n;
+  } catch (e) {}
+}
+
+/** How many channels the current device offers, as far as the browser says. */
+export function deviceChannels() {
+  start().catch(() => {});
+  return ctx?.destination?.maxChannelCount || 2;
+}
+
+/** Whether this browser lets a page pick its own output device. */
+export function canChooseDevice() {
+  const AC = window.AudioContext || window.webkitAudioContext;
+  return !!AC && typeof AC.prototype.setSinkId === 'function';
+}
+
+/**
+ * Play through one device rather than the system's. '' is the system output.
+ * Resolves to the channel count the new device offers; rejects if the browser
+ * refused, which leaves the context on whatever it was on before.
+ */
+export async function setDevice(id) {
+  start().catch(() => {});
+  if (!ctx || typeof ctx.setSinkId !== 'function') return deviceChannels();
+  if ((ctx.sinkId || '') !== (id || '')) await ctx.setSinkId(id || '');
+  configureDestination();
+  return deviceChannels();
 }
 
 /**

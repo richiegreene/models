@@ -61,6 +61,11 @@ function mipFor(freq) {
  * height it actually got to — which is what makes a staccato tap quiet. */
 const ATTACK = 0, DECAY = 1, SUSTAIN = 2, RELEASE = 3, DONE = 4;
 
+/* The parts a chord can have — a voice's id is its part, 0 the lowest — and
+ * a routing mask with every one of them in it. */
+const PARTS = 4;
+const ALL_PARTS = (1 << PARTS) - 1;
+
 class Voice {
   constructor() { this.reset(); }
 
@@ -208,6 +213,14 @@ class XenachordVoiceProcessor extends AudioWorkletProcessor {
     this.adsr = { a: 0.016, d: 0.120, s: 0.66, r: 0.544 };
     this.gain = 0.22;
     this.pole = Math.pow(0.5, 44100 / sampleRate); // synth.js FILTERED.pole
+    /* WHERE EACH PART GOES. One mask per output channel, a bit per part:
+     * channel c carries the sum of the parts whose bits are set in masks[c].
+     * Null is the stereo mix, every part in every channel — what this node
+     * always did, and still does by the same arithmetic. With masks the
+     * voices are rendered part by part into `parts` and then summed per
+     * channel, so one player's in-ear feed holds only that player's line. */
+    this.masks = null;
+    this.parts = null;            // Float32Array[PARTS], one block each
     /* Samples rendered so far — the clock a delayed onset is timed on. Every
      * message is handled between two blocks, so `clock` is then exactly the
      * first sample of the next one, and a chord's notes, posted together,
@@ -283,6 +296,9 @@ class XenachordVoiceProcessor extends AudioWorkletProcessor {
       case 'allOff':
         for (const v of this.voices) { v.unplan(); v.off(); }
         break;
+      case 'route':
+        this.masks = m.masks ? Int32Array.from(m.masks) : null;
+        break;
     }
   }
 
@@ -291,12 +307,22 @@ class XenachordVoiceProcessor extends AudioWorkletProcessor {
     const n = out[0].length;
     const sr = sampleRate;
     const dt = 1 / sr;
-    const buf = out[0];
-    buf.fill(0);
+    const mix = out[0];
+    mix.fill(0);
+    const masks = this.masks;
+    if (masks) {
+      if (!this.parts || this.parts[0].length !== n) {
+        this.parts = Array.from({ length: PARTS }, () => new Float32Array(n));
+      }
+      for (const p of this.parts) p.fill(0);
+    }
 
     const t0 = this.clock;
     for (const v of this.voices) {
       if (v.stage === DONE && v.next === Infinity) continue;
+      /* Into the mix, or into its own part's block when the parts are
+       * going to different places. */
+      const buf = masks ? this.parts[v.id >= 0 && v.id < PARTS ? v.id : 0] : mix;
 
       /* Each sample first carries out anything due on the voice's timeline,
        * then skips it while it is silent — a voice waiting on a late onset
@@ -363,8 +389,27 @@ class XenachordVoiceProcessor extends AudioWorkletProcessor {
     /* A soft knee rather than a hard ceiling: thirty-two keys held at once is
      * a chord somebody meant, and it should get quieter and thicker rather
      * than square off into distortion. */
-    for (let i = 0; i < n; i++) buf[i] = Math.tanh(buf[i] * this.gain);
-    for (let c = 1; c < out.length; c++) out[c].set(buf);
+    if (!masks) {
+      for (let i = 0; i < n; i++) mix[i] = Math.tanh(mix[i] * this.gain);
+      for (let c = 1; c < out.length; c++) out[c].set(mix);
+      return true;
+    }
+
+    /* Each channel is the sum of its own parts, through the same knee. A
+     * part routed to two channels is the same samples twice, so a doubled
+     * line is in step with itself to the sample. */
+    for (let c = 0; c < out.length; c++) {
+      const ch = out[c];
+      const mask = (masks[c] | 0) & ALL_PARTS;
+      if (!mask) { ch.fill(0); continue; }
+      let first = true;
+      for (let p = 0; p < PARTS; p++) {
+        if (!(mask & (1 << p))) continue;
+        if (first) { ch.set(this.parts[p]); first = false; }
+        else { const src = this.parts[p]; for (let i = 0; i < n; i++) ch[i] += src[i]; }
+      }
+      for (let i = 0; i < n; i++) ch[i] = Math.tanh(ch[i] * this.gain);
+    }
     return true;
   }
 }

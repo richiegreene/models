@@ -2,7 +2,7 @@
  *  THE PANEL
  * =====================================================================
  *
- * Four drawers behind one rail, in Keyboard Designer's own idiom, and the
+ * Five drawers behind one rail, in Keyboard Designer's own idiom, and the
  * split between them is by what a control is FOR rather than by what it acts
  * on:
  *
@@ -10,6 +10,7 @@
  *   Display              what is done with the ones that do
  *   Play                 what they sound like
  *   Export               who else gets them
+ *   Settings             where the sound goes — see outputs.js
  *
  * The same four in all three modes, because all three ask the same questions
  * of the same set — which is why the mode switch sits ABOVE them rather than
@@ -46,6 +47,7 @@ import {
 import { halftone, halftoneOn } from '../calculations/halftone.js';
 import { estimateWork, sayWork, WORK_BUDGET } from '../calculations/work-estimate.js';
 import { initMidiOutput, sendMpePressure, mpeChannels } from '../midi/midi-output.js';
+import { setupOutputs } from '../components/outputs.js';
 import { createTimbrePicker, FILTERED_MIN } from '../synth/timbre.js';
 import { attachAdsrEditor } from '../synth/adsr.js';
 import { arpLabel } from '../synth/arpeggio.js';
@@ -1276,6 +1278,9 @@ export function setupUIEventListeners() {
             mpeChannels.forEach(channel => sendMpePressure(channel, newPressure));
         });
     }
+
+    /* ---------------- Settings: where the sound goes ---------------- */
+    setupOutputs();
 
     /* ---------------- Play: voice leading ---------------- */
     const enableSlideCheckbox = $('enableSlide');

@@ -60,6 +60,18 @@
           <path d="M5 17v3.5h16V17" />
         </svg>
       </button>
+      <!-- Settings: a gear, for where the sound goes once it leaves the
+           synth — which device, and which output each part is sent to. Under
+           Export because it is the same question asked of the sound: not what
+           it is, but who gets it. -->
+      <button class="rail-btn" data-drawer="settings" aria-expanded="false"
+        title="Settings — the output device, and which part goes to which output">
+        <svg class="rail-icon" viewBox="0 0 26 26" fill="none" stroke="currentColor"
+          stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <circle cx="13" cy="13" r="3.1" />
+          <path d="M20.4 15.7a1.6 1.6 0 0 0 .32 1.77l.06.06a1.95 1.95 0 1 1-2.76 2.76l-.06-.06a1.6 1.6 0 0 0-1.77-.32 1.6 1.6 0 0 0-.97 1.47v.17a1.95 1.95 0 1 1-3.9 0v-.09a1.6 1.6 0 0 0-1.05-1.47 1.6 1.6 0 0 0-1.77.32l-.06.06a1.95 1.95 0 1 1-2.76-2.76l.06-.06a1.6 1.6 0 0 0 .32-1.77 1.6 1.6 0 0 0-1.47-.97h-.17a1.95 1.95 0 1 1 0-3.9h.09a1.6 1.6 0 0 0 1.47-1.05 1.6 1.6 0 0 0-.32-1.77l-.06-.06a1.95 1.95 0 1 1 2.76-2.76l.06.06a1.6 1.6 0 0 0 1.77.32h.08a1.6 1.6 0 0 0 .97-1.47v-.17a1.95 1.95 0 1 1 3.9 0v.09a1.6 1.6 0 0 0 .97 1.47 1.6 1.6 0 0 0 1.77-.32l.06-.06a1.95 1.95 0 1 1 2.76 2.76l-.06.06a1.6 1.6 0 0 0-.32 1.77v.08a1.6 1.6 0 0 0 1.47.97h.17a1.95 1.95 0 1 1 0 3.9h-.09a1.6 1.6 0 0 0-1.47.97z" />
+        </svg>
+      </button>
       <a class="rail-btn" id="info-link" href="https://github.com/richiegreene/models"
         target="_blank" rel="noopener noreferrer" title="About Models">
         <svg class="rail-icon" viewBox="0 0 26 26" fill="none" stroke="currentColor"
@@ -997,6 +1009,64 @@
               <button class="wide" id="dl-csv"
                 title="Every chord in the set — dyads, triads or tetrads, whichever mode is up: the enumerated chord, its notes as ratios, its cents, and its complexity under the chosen measure, sorted simplest first. Where a model is up it also carries what that model says about each chord — harmonic entropy in nats. (⇧⌘S)">⬇︎ Save Chords (.csv)</button>
             </div>
+          </fieldset>
+        </div>
+
+        <!-- ============ SETTINGS ============
+             Where the in-browser synth is heard. Stereo Mix is the app as it
+             always was: every part in both ears. The other two split the
+             chord into its parts and give each output its own — one per
+             player's in-ear feed. Split Stereo names the outputs as stereo
+             pairs, for a rig that takes each pair's left and right apart into
+             two mono feeds; Multichannel names them 1, 2, 3 … as an
+             interface does. The routing is the same either way: output 1 is
+             the device's first channel. Built by outputs.js. -->
+        <div class="drawer hidden" data-drawer="settings">
+          <h1><span class="mode-name">Tetrads</span> <small>· settings</small></h1>
+
+          <fieldset>
+            <legend>Audio Output</legend>
+            <div class="pressrow">
+              <label for="outDevice">Device</label>
+              <span class="pressval" id="out-ch"
+                title="How many output channels the browser can open on this device">2 ch</span>
+            </div>
+            <select id="outDevice"
+              title="Where the in-browser synth plays. System Output follows the Mac's own Sound setting; choosing a device here leaves that setting alone.">
+              <option value="">System Output</option>
+            </select>
+            <div class="btns" id="out-find-row" hidden>
+              <button class="wide" id="out-find"
+                title="A browser names its output devices only once the page may use an input. This asks for the microphone, closes it at once and records nothing.">Show All Devices</button>
+            </div>
+            <div class="hint" id="out-device-hint" hidden></div>
+
+            <div class="tune-h">Routing</div>
+            <div class="seg" id="out-layout">
+              <button data-v="mix" class="on"
+                title="Every part in both channels — one stereo feed, as the app has always played.">Stereo Mix</button>
+              <button data-v="split"
+                title="Each channel of each stereo pair its own mono feed: pair 1 left, pair 1 right, pair 2 left … for a rig that splits each pair into two.">Split Stereo</button>
+              <button data-v="multi"
+                title="Each output of a multichannel device its own mono feed, numbered as the device numbers them.">Multichannel</button>
+            </div>
+          </fieldset>
+
+          <!-- One row per output, one key per part: the lit keys are what
+               that output carries. A part may be lit on several rows — a
+               doubled line, for when there are more players than parts — and
+               a row may carry several parts, or none. Each mode keeps its own,
+               so a dyad's doubling does not disturb a tetrad's four. -->
+          <fieldset id="out-routing" hidden>
+            <legend>Outputs</legend>
+            <div id="out-rows"></div>
+            <div class="btns">
+              <button id="out-double"
+                title="Give every silent output a part, repeating the outputs above it in order — with two parts and four outputs, 3 and 4 carry what 1 and 2 do.">Double Parts</button>
+              <button id="out-reset"
+                title="One part per output, top voice first, and any output past the last part silent.">One Each</button>
+            </div>
+            <div class="hint" id="out-hint" hidden></div>
           </fieldset>
         </div>
       </div>

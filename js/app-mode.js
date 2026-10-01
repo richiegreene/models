@@ -49,6 +49,14 @@ const modes = new Map();
 export function registerMode(name, hooks) { modes.set(name, hooks); }
 
 /**
+ * Anything outside the modes that has to follow the switch — the output
+ * routing, which sends a dyad's two parts somewhere different from a tetrad's
+ * four. Told after the panel has changed, at startup as well as on a switch.
+ */
+const followers = [];
+export function onModeApplied(fn) { followers.push(fn); }
+
+/**
  * Put the panel into one mode.
  *
  * Split out of switchMode because it has to happen at startup as well, where
@@ -74,6 +82,7 @@ export function applyModeClasses(mode) {
     for (const h of document.querySelectorAll('.drawer h1 .mode-name')) {
         h.textContent = title;
     }
+    for (const fn of followers) fn(mode);
 }
 
 /**
