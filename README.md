@@ -209,6 +209,13 @@ The gear under Export: where the in-browser synth is heard, and which part goes 
   * **One Each** puts it back to one part per output, top voice first
 * All outputs come from one audio clock, so the parts stay sample-locked to each other, and a doubled part is the same samples on both outputs.
 
+## Full screen
+The button at the foot of the rail opens the view alone in a window of its own, for a projector: whatever the stage is showing and the notation readout over it, live and scaled to fill the window, with no panel and no pointer. This window keeps every control, so the performer plays here and the room sees only the picture.
+* With the projector attached as a second display (extended, not mirrored), Chrome can put the window straight onto it at that screen's size, once the page is allowed to manage windows. Otherwise it opens beside the app and can be dragged across.
+* Click it there to fill the screen; Esc leaves full screen. The button is lit while the mirror is open, and pressing it again shuts it.
+* Keys pressed while the mirror has the focus — ⇧, S A T B, the arrows — are handed on to the app, so playing carries on after the click that filled the screen.
+* The mirror follows the app as it changes: a mode switch, a second pane, the drawer shutting and the view widening. It is scaled to fit without distortion and framed in the view's own ground, so shutting the drawer gives the projector a wider picture. Reloading the app leaves the mirror up and it picks the new page up by itself.
+
 ## Harmonic entropy
 One statement of the model serves the three modes: it is written to Pyodide as `he_core.py` (source in [js/he/he-python.js](js/he/he-python.js)), and each mode's generator does only what is particular to its dimension — which chords are in the basis set, and where they land on the grid. Sources: the Xenharmonic Wiki's [Harmonic entropy](https://en.xen.wiki/w/Harmonic_entropy) (Erlich; the convolution form and the Rényi generalisation by Battaglia), Mike Battaglia's [HE-JS](http://www.mikebattagliamusic.com/HE-JS/HE.html) calculator, and Sintel's [harmonic_entropy_triads.ipynb](https://gist.github.com/Sin-tel/8d1a55a0e34ca159ac6aa61e325648d2).
 

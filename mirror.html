@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>models · mirror</title>
+    <link rel="icon" href="favicon.png?v=4" type="image/png" sizes="any">
+    <link rel="icon" href="favicon.svg?v=4" type="image/svg+xml">
+    <!-- For the readout: its fonts and its look are the app's own. -->
+    <link rel="stylesheet" href="style.css">
+    <style>
+        /* The view and nothing else: no panel, no scroll, and no pointer —
+           the arrow is the performer's, not the audience's. */
+        html, body { margin: 0; height: 100%; overflow: hidden; background: #000; }
+        *, *::before, *::after { cursor: none !important; }
+        #frame { position: absolute; left: 0; top: 0; transform-origin: 0 0; overflow: hidden; }
+        #frame video, #frame canvas { position: absolute; display: block; object-fit: fill; pointer-events: none; }
+        /* Said once, while the window is being set up, and gone from the
+           projection the moment it fills the screen. */
+        #note { position: fixed; left: 50%; top: 50%; transform: translate(-50%, -50%);
+            padding: 10px 16px; border-radius: 8px; background: rgba(30, 31, 37, .92);
+            border: 1px solid #555; color: #fff; font-size: 13px; white-space: nowrap;
+            transition: opacity .4s ease; pointer-events: none; z-index: 20; }
+        #note.gone { opacity: 0; }
+    </style>
+</head>
+<body>
+    <div id="frame"><div id="notation-display"></div></div>
+    <div id="note">Click to fill this screen · Esc to leave</div>
+    <script type="module" src="js/components/mirror-window.js"></script>
+</body>
+</html>

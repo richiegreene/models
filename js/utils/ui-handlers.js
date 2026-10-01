@@ -48,6 +48,7 @@ import { halftone, halftoneOn } from '../calculations/halftone.js';
 import { estimateWork, sayWork, WORK_BUDGET } from '../calculations/work-estimate.js';
 import { initMidiOutput, sendMpePressure, mpeChannels } from '../midi/midi-output.js';
 import { setupOutputs } from '../components/outputs.js';
+import { setupMirror } from '../components/mirror.js';
 import { createTimbrePicker, FILTERED_MIN } from '../synth/timbre.js';
 import { attachAdsrEditor } from '../synth/adsr.js';
 import { arpLabel } from '../synth/arpeggio.js';
@@ -1281,6 +1282,9 @@ export function setupUIEventListeners() {
 
     /* ---------------- Settings: where the sound goes ---------------- */
     setupOutputs();
+
+    /* ---------------- Full screen: the view, for a projector ---------------- */
+    setupMirror();
 
     /* ---------------- Play: voice leading ---------------- */
     const enableSlideCheckbox = $('enableSlide');

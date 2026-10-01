@@ -92,6 +92,9 @@ button,input,select,textarea{font-family:inherit}
 .rail-btn:hover{color:var(--text);background:var(--panel2)}
 .rail-btn[aria-expanded="true"]{color:var(--text);background:transparent;
   box-shadow:inset 0 0 0 1px var(--accent)}
+/* A switch that is on — the full-screen mirror while its window is open —
+   lit the way the drawer you are in is lit. */
+.rail-btn[aria-pressed="true"]{color:var(--text);box-shadow:inset 0 0 0 1px var(--accent)}
 .rail-icon{width:24px;height:24px}
 .rail-icon.rail-icon-diagonal{transform:rotate(-45deg)}
 /* The info link sits at the foot of the rail rather than in the run of
