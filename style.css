@@ -230,11 +230,7 @@ button.primary:hover{border-color:var(--accent);color:#fff}
    Continuously are both switches that stay down, so they look alike. */
 #playButton.play-button-active,
 button.latched{background:#24405c;border-color:var(--accent);color:#cfe6ff}
-#autoRotate,#tetradSweep{width:100%;margin-top:8px}
-/* Display › Full Screen: the corners beside the words, in the button's own
-   colour, so it lights and hovers with it. */
-#mirror-toggle{width:100%;display:flex;align-items:center;justify-content:center;gap:7px;padding:8px}
-#mirror-toggle svg{width:14px;height:14px;flex:none}
+#autoRotate,#tetradSweep,#mirror-toggle{width:100%;margin-top:8px}
 
 /* With a halftone on, the chips still say what the layouts are, but none of
    them is what is on screen; they dim and stand down until it is off. */
