@@ -50,6 +50,7 @@ import { rotationSpeed, autoRotate, autoRotateDir, keyState } from '../globals.j
 import {
     halftoneOn, HALFTONE_GLSL, halftoneUniforms, syncHalftoneUniforms, groundHex, inkHex,
 } from '../calculations/halftone.js';
+import { followProjection, applyProjection, refreshProjection, rayFrom } from '../components/projection.js';
 
 /* ---- the surface in one ink ----
    Two lays of the one screen, chosen by a uniform — see halftone.js. On the
@@ -224,6 +225,9 @@ export function attach3D(el, gestureHandler) {
     controls.dampingFactor = 0.25;
     controls.minDistance = 1.2;
     controls.maxDistance = 24;
+    /* Perspective or orthographic, as Display › Visuals says, framed from how
+       far the camera is from what it orbits. See projection.js. */
+    followProjection(camera, () => camera.position.distanceTo(controls.target));
 
     /* A key from up and to the left — the direction every relief map is read
        by, and the same one the flat pane hillshades from, so the two panes are
@@ -505,6 +509,11 @@ function solveFrame(margin = FIT_MARGIN) {
         probe.lookAt(target);
         probe.updateMatrixWorld(true);
         probe.updateProjectionMatrix();
+        /* Solved in the projection the pane is drawn in. In orthographic the
+           same loop converges in a pass or two: the picture's size is then
+           exactly inverse to the distance, and an offset worth halfH at the
+           target is worth it everywhere. */
+        applyProjection(probe, distance);
 
         let xMin = Infinity, xMax = -Infinity, yMin = Infinity, yMax = -Infinity;
         for (const c of corners) {
@@ -1103,6 +1112,7 @@ export function draw(o) {
 export function render() {
     if (!renderer || !scene || !camera) return;
     controls.update();
+    refreshProjection(camera);
 
     /* Turned exactly the way the tetrahedron is turned, off the same three
        settings: the arrow keys nudge it, Rotate Continuously latches it, and
@@ -1201,7 +1211,7 @@ function pick(ev) {
     const r = renderer.domElement.getBoundingClientRect();
     ndc.x = ((ev.clientX - r.left) / r.width) * 2 - 1;
     ndc.y = -((ev.clientY - r.top) / r.height) * 2 + 1;
-    raycaster.setFromCamera(ndc, camera);
+    rayFrom(raycaster, ndc, camera);
 
     let point = null;
     if (surface) {

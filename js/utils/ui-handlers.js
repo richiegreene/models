@@ -49,6 +49,7 @@ import { estimateWork, sayWork, WORK_BUDGET } from '../calculations/work-estimat
 import { initMidiOutput, sendMpePressure, mpeChannels } from '../midi/midi-output.js';
 import { setupOutputs } from '../components/outputs.js';
 import { setupMirror } from '../components/mirror.js';
+import { setProjection } from '../components/projection.js';
 import { createTimbrePicker, FILTERED_MIN } from '../synth/timbre.js';
 import { attachAdsrEditor } from '../synth/adsr.js';
 import { arpLabel } from '../synth/arpeggio.js';
@@ -817,6 +818,12 @@ export function setupUIEventListeners() {
     };
     seg('halftone-seg', (v) => { halftone.method = v; applyHalftone(); });
     seg('halftone-lay-seg', (v) => { halftone.shape = v === 'shape'; applyHalftone({ sizeOnly: true }); });
+
+    /* Perspective or orthographic, for both 3D views at once. Laid out again
+       after, so the lifted triangle is re-fitted in the new projection — around
+       any orbit and zoom already made, as a resize is — rather than left at a
+       framing solved for the other one. */
+    seg('projection-seg', (v) => { setProjection(v); layoutStage(); });
     press('halftoneSize', 'halftone-size-v',
         (v) => { halftone.size = v; applyHalftone({ sizeOnly: true }); },
         (v) => `${v} px`);

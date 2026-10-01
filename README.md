@@ -126,6 +126,7 @@ With the field up, **.png** is the view itself — a ray-marched volume is not a
     * speed up: ] or }
     * slow dow: [ or {
 * Zoom: two-finger scroll/mouse-wheel
+* **Projection** (Display › Visuals, Triads and Tetrads — Dyads has nothing in 3D): **Perspective**, as an eye sees it, nearer is bigger; or **Orthographic**, as a drawing is made, with parallel edges staying parallel and the same length measuring the same at any depth. One setting for the lifted triangle and the tetrahedron, after Keyboard Designer's toggle and framed the same way: the orthographic view is sized from the camera's distance to what it orbits, so switching changes the depth and not the zoom, and the wheel zooms in both. Everything follows it — playing and hovering, the 4HE body and its halftone, the exports.
 * Layout/Looks: ⇧⌘L cycles the colormap; the same twelve are in Display › Visuals as swatches. Ten are ramps, where colour carries the measure. The two **Constant** layouts are one colour and no gradient — in all three modes — because their surface is meant to be read off its lighting and its geometry, with the measure left to Size; the swatch on the chip sets the body colour, and the marks drawn on it take that colour's hue at a brightness the ground can be read against.
   * Plasma, Viridis and Magma — perceptually uniform ramps
   * Blue — [Isoharmonics](https://github.com/richiegreene/isoharmonics)' own gradient, stop for stop

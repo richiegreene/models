@@ -15,6 +15,7 @@ import {
 } from '../globals.js';
 
 import { appMode } from '../app-mode.js';
+import { followProjection, refreshProjection, rayFrom, isOrtho } from './projection.js';
 import { initAudio, stopChord, playChord } from '../components/audio-engine.js';
 import { sendMpePressure, mpeChannels } from '../midi/midi-output.js';
 import { updateMpePressureSliderUI } from '../utils/ui-handlers.js';
@@ -272,7 +273,7 @@ function onMouseMove(event) {
     mouse.y = -((event.clientY - canvasBounds.top) / canvasBounds.height) * 2 + 1;
 
     const raycaster = new THREE.Raycaster();
-    raycaster.setFromCamera(mouse, camera);
+    rayFrom(raycaster, mouse, camera);
     const intersects = raycaster.intersectObjects(currentSprites);
 
     if (intersects.length > 0) {
@@ -310,7 +311,7 @@ function onClick(event) {
     mouse.y = -((event.clientY - canvasBounds.top) / canvasBounds.height) * 2 + 1;
 
     const raycaster = new THREE.Raycaster();
-    raycaster.setFromCamera(mouse, camera);
+    rayFrom(raycaster, mouse, camera);
     const intersects = raycaster.intersectObjects(currentSprites);
 
     if (intersects.length > 0) {
@@ -347,6 +348,9 @@ export function initThreeJS() {
     controls.screenSpacePanning = false;
     controls.minDistance = 1;
     controls.maxDistance = 30;
+    /* Perspective or orthographic, as Display › Visuals says — framed from
+       how far the camera is from what it orbits. See projection.js. */
+    followProjection(camera, () => camera.position.distanceTo(controls.target));
 
     window.addEventListener('keydown', onKeyDown, false);
     window.addEventListener('keyup', onKeyUp, false);
@@ -397,11 +401,20 @@ export function animate() {
         else scene.rotation.y += rotationSpeed;
     }
 
+    /* An orthographic frame is sized by the camera's distance, which the
+       wheel has just changed. */
+    refreshProjection(camera);
+
     if (currentLayoutDisplay === 'labels' || currentLayoutDisplay === 'points') {
         const spriteWorldPosition = new THREE.Vector3();
+        /* Every mark is scaled by its distance so it keeps one size on the
+           screen. In orthographic nothing shrinks with depth, so they are all
+           scaled by the one distance the frame is sized from — scaling each by
+           its own would make the near ones the smaller. */
+        const orbit = isOrtho() ? camera.position.distanceTo(controls.target) : 0;
         currentSprites.forEach(sprite => {
             sprite.getWorldPosition(spriteWorldPosition);
-            const distance = camera.position.distanceTo(spriteWorldPosition);
+            const distance = orbit || camera.position.distanceTo(spriteWorldPosition);
             let currentSpriteSize;
 
             if (sprite.userData.type === 'label') {

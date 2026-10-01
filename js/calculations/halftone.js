@@ -337,9 +337,15 @@ vec3 htScatter(vec3 q) {
     return h * 2.0 - 1.0;
 }
 
+/* How far a mark is, for what a pixel is worth there: its own depth along the
+   ray — or, in an orthographic view, where nothing shrinks with distance, the
+   one depth the frame is sized at, which the body sets before it marches. */
+float htFlat = 0.0;
+float htDepth(float t) { return htFlat > 0.0 ? htFlat : max(t, 1e-4); }
+
 /* How much of a mark to count, by its size on the page at its depth. */
 float htVisible(float r, float t, float px) {
-    return smoothstep(0.35, 1.0, r / (px * max(t, 1e-4)));
+    return smoothstep(0.35, 1.0, r / (px * htDepth(t)));
 }
 
 float htRadius3(float v, int method) {
@@ -361,7 +367,7 @@ float htGlobe(vec3 o, vec3 d, vec3 c, float r, float t0, float t1, float px) {
     float tcl = clamp(tc, t0, t1);
     vec3 at = o + tcl * d;
     float dist = length(at - c);
-    float aa = 0.5 * px * max(tcl, 1e-4) + 1e-6;
+    float aa = 0.5 * px * htDepth(tcl) + 1e-6;
     return (1.0 - smoothstep(r - aa, r + aa, dist)) * htVisible(r, tcl, px);
 }
 
@@ -381,7 +387,7 @@ float htRod(vec3 o, vec3 d, vec3 c, vec3 a, float r, float t0, float t1, float p
     if (tc + h <= t0 || tc - h >= t1) return 0.0;
     float tcl = clamp(tc, t0, t1);
     float dist = sqrt(max(A * tcl * tcl + 2.0 * B * tcl + C, 0.0));
-    float aa = 0.5 * px * max(tcl, 1e-4) + 1e-6;
+    float aa = 0.5 * px * htDepth(tcl) + 1e-6;
     return (1.0 - smoothstep(r - aa, r + aa, dist)) * htVisible(r, tcl, px);
 }
 

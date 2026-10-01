@@ -49,6 +49,7 @@ import {
     scene, camera, renderer, controls, isClickPlayModeActive, currentLayoutMode,
 } from '../globals.js';
 import { colormapAt, isLightGround } from '../calculations/color-mapping.js';
+import { isOrtho, rayFrom } from '../components/projection.js';
 import {
     HALFTONE_GLSL, HALFTONE_VOLUME_GLSL, halftoneUniforms, syncHalftoneUniforms, cellWorld,
 } from '../calculations/halftone.js';
@@ -153,6 +154,9 @@ void main() {
 
 const BODY_FRAG = COMMON + /* glsl */`
 uniform vec3 uCam;
+uniform vec3 uCamDir;
+uniform float uOrtho;
+uniform float uOrbit;
 uniform float uDensity;
 uniform float uFocus;
 uniform int uSteps;
@@ -183,8 +187,14 @@ void main() {
        the eye may be inside it; the entry is found from the four half-spaces
        rather than assumed. In barycentric coordinates the ray is a straight
        line, so each constraint is one division. */
-    vec3 dir = normalize(vLocal - uCam);
-    vec3 b0 = toBary(uCam);
+    /* In orthographic every ray runs the one way the camera looks, and
+       starts where the camera's own plane is crossed under this pixel — the
+       same eye, slid across to stand in front of it. The halftone's marks
+       are then all as far away as the plane the frame is sized at. */
+    vec3 dir = uOrtho > 0.5 ? uCamDir : normalize(vLocal - uCam);
+    vec3 eye = uOrtho > 0.5 ? vLocal - dir * dot(vLocal - uCam, dir) : uCam;
+    htFlat = uOrtho > 0.5 ? uOrbit : 0.0;
+    vec3 b0 = toBary(eye);
     vec3 bd = uToBary * dir;
     vec4 c0 = vec4(b0, 1.0 - b0.x - b0.y - b0.z);
     vec4 cd = vec4(bd, -(bd.x + bd.y + bd.z));
@@ -215,7 +225,7 @@ void main() {
        halftoneVolume. A well is then a cluster: packed solid where the
        chord is simplest, thinning to a sprinkle of small stars around it. */
     if (uHtMethod > 0 && uHtShape == 1) {
-        float c = halftoneVolume(uCam, dir, tmin, tmax, uHtCellWorld, uHtMethod, uHtPxWorld);
+        float c = halftoneVolume(eye, dir, tmin, tmax, uHtCellWorld, uHtMethod, uHtPxWorld);
         outColor = vec4(uHtInk * c, c);
         return;
     }
@@ -321,6 +331,9 @@ export function attachField(gestureHandler, opts, sweepHandler) {
         uniforms: {
             ...shared(),
             uCam: { value: new THREE.Vector3() },
+            uCamDir: { value: new THREE.Vector3(0, 0, -1) },
+            uOrtho: { value: 0 },
+            uOrbit: { value: 1 },
             uDensity: { value: tetradDensity },
             uFocus: { value: tetradFocus },
             uSteps: { value: STEPS },
@@ -544,6 +557,8 @@ export function syncVisibility() {
  * ------------------------------------------------------------------ */
 
 const camWorld = new THREE.Vector3();
+const camDir = new THREE.Vector3();
+const toLocal = new THREE.Matrix4();
 let sweepDir = 1;
 let lastFrameAt = 0;
 
@@ -563,7 +578,16 @@ export function frameField() {
     scene.updateMatrixWorld(true);
     camera.getWorldPosition(camWorld);
     group.worldToLocal(camWorld);
-    body.material.uniforms.uCam.value.copy(camWorld);
+    const u = body.material.uniforms;
+    u.uCam.value.copy(camWorld);
+    /* Which way the camera looks, in the shape's frame, and how far it is
+       from what it orbits — all an orthographic ray needs. */
+    u.uOrtho.value = isOrtho() ? 1 : 0;
+    if (isOrtho()) {
+        camera.getWorldDirection(camDir);
+        u.uCamDir.value.copy(camDir.transformDirection(toLocal.copy(group.matrixWorld).invert()));
+        u.uOrbit.value = camera.position.distanceTo(controls.target);
+    }
     /* The two pixel scales follow the pane's size, which nothing else here
        is told about; a few multiplies a frame is cheaper than listening. */
     if (body.material.uniforms.uHtShape.value) {
@@ -658,7 +682,7 @@ function pick(ev) {
     const r = renderer.domElement.getBoundingClientRect();
     ndc.x = ((ev.clientX - r.left) / r.width) * 2 - 1;
     ndc.y = -((ev.clientY - r.top) / r.height) * 2 + 1;
-    raycaster.setFromCamera(ndc, camera);
+    rayFrom(raycaster, ndc, camera);
     const hits = raycaster.intersectObject(cut, false);
     if (!hits.length) return null;
     const p = hits[0].point.clone();

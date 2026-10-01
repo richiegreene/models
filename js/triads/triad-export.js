@@ -199,8 +199,8 @@ export function exportTriadSVG() {
 export function saveTriadSVG() {
     if (triadView === '3d') {
         /* A lifted surface has no honest vector form — it is a shaded mesh
-           under a perspective camera. Saying so is better than emitting a
-           .svg with a screenshot inside it. */
+           under a camera, perspective or orthographic. Saying so is better
+           than emitting a .svg with a screenshot inside it. */
         saveTriadPNG('triads-3d.png');
         return;
     }

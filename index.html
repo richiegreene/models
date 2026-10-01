@@ -756,6 +756,20 @@
                 title="The pitch of the screen — how far apart its cells are, in pixels. Fine is a tone; coarse is a texture you can count. Laid on the shape, that is its size at the view the pane opens on; zoom in and it grows.">
             </div>
 
+            <!-- ---- how the 3D panes are projected ----
+                 Keyboard Designer's toggle, for the same two views: Perspective
+                 as an eye sees it, nearer is bigger; Orthographic as a drawing
+                 is made, parallel edges staying parallel at any depth. Framed
+                 to match, so switching changes the depth and not the zoom.
+                 Triads' lifted surface and the tetrahedron share it; Dyads
+                 has nothing in 3D. See projection.js. -->
+            <div class="tune-h" data-mode="triads tetrads">Projection</div>
+            <div class="seg" id="projection-seg" data-mode="triads tetrads">
+              <button data-v="persp" class="on"
+                title="As an eye sees it: nearer is bigger, and parallel edges run together into the distance.">Perspective</button>
+              <button data-v="orth"
+                title="As a drawing is made: every point carried straight onto the screen, so parallel edges stay parallel and the same length measures the same at any depth.">Orthographic</button>
+            </div>
             <!-- ---- how fast the shape turns ----
                  The arrow keys have always turned the tetrahedron and [ ]
                  have always changed how fast; the rate was the one thing you
