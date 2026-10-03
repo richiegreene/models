@@ -50,6 +50,7 @@ import { initMidiOutput, sendMpePressure, mpeChannels } from '../midi/midi-outpu
 import { setupOutputs } from '../components/outputs.js';
 import { setupMirror } from '../components/mirror.js';
 import { setProjection } from '../components/projection.js';
+import { outline, outlineOn } from '../components/outline.js';
 import { createTimbrePicker, FILTERED_MIN } from '../synth/timbre.js';
 import { attachAdsrEditor } from '../synth/adsr.js';
 import { arpLabel } from '../synth/arpeggio.js';
@@ -824,6 +825,15 @@ export function setupUIEventListeners() {
        any orbit and zoom already made, as a resize is — rather than left at a
        framing solved for the other one. */
     seg('projection-seg', (v) => { setProjection(v); layoutStage(); });
+
+    /* The outline, for both 3D views at once. Both panes draw every frame
+       and read it as they draw, so nothing has to be rebuilt or invalidated:
+       the next frame simply has it, or does not. */
+    const outlineParams = $('outline-params');
+    seg('outline-seg', (v) => { outline.ink = v; outlineParams.hidden = !outlineOn(); });
+    press('outlineWidth', 'outline-width-v', (v) => { outline.width = v; }, (v) => `${v} px`);
+    outlineParams.hidden = !outlineOn();
+
     press('halftoneSize', 'halftone-size-v',
         (v) => { halftone.size = v; applyHalftone({ sizeOnly: true }); },
         (v) => `${v} px`);

@@ -743,6 +743,35 @@
                 title="The pitch of the screen — how far apart its cells are, in pixels. Fine is a tone; coarse is a texture you can count. Laid on the shape, that is its size at the view the pane opens on; zoom in and it grows.">
             </div>
 
+            <!-- ---- line art over the shapes ----
+                 Blender's Line Art, as a layer over either 3D view: a stroke
+                 wherever a shape ends against the ground, passes in front of
+                 another part of itself, folds sharply, or meets something
+                 else — so a summit is outlined against the slope behind it
+                 and a well of the tetrahedron's body against the haze. Black
+                 and White rather than the theme's ink, because on the dark
+                 ground a black outline is the pen drawing and a white one is
+                 the glow, and both are wanted. The lattice, the labels and
+                 the contours are never outlined: they are drawings already.
+                 See outline.js. -->
+            <div class="tune-h" data-mode="triads tetrads">Outline</div>
+            <div class="seg" id="outline-seg" data-mode="triads tetrads">
+              <button data-v="off" class="on"
+                title="The shapes as they are, with no line art over them.">Off</button>
+              <button data-v="black"
+                title="Outline every shape in black — its silhouette, every place one part of it passes in front of another, and its sharp folds.">Black</button>
+              <button data-v="white"
+                title="The same outline, drawn in white.">White</button>
+            </div>
+            <div id="outline-params" data-mode="triads tetrads" hidden>
+              <div class="pressrow">
+                <label for="outlineWidth">Thickness</label>
+                <span class="pressval" id="outline-width-v">3 px</span>
+              </div>
+              <input type="range" id="outlineWidth" min="0.5" max="16" step="0.5" value="3"
+                title="How heavy the outline is drawn, in pixels. A hair's width is a technical drawing; at ten pixels it is a brush.">
+            </div>
+
             <!-- ---- how the 3D panes are projected ----
                  Keyboard Designer's toggle, for the same two views: Perspective
                  as an eye sees it, nearer is bigger; Orthographic as a drawing

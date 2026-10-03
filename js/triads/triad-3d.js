@@ -51,6 +51,7 @@ import {
     halftoneOn, HALFTONE_GLSL, halftoneUniforms, syncHalftoneUniforms, groundHex, inkHex,
 } from '../calculations/halftone.js';
 import { followProjection, applyProjection, refreshProjection, rayFrom } from '../components/projection.js';
+import { drawOutline } from '../components/outline.js';
 
 /* ---- the surface in one ink ----
    Two lays of the one screen, chosen by a uniform — see halftone.js. On the
@@ -249,6 +250,7 @@ export function attach3D(el, gestureHandler) {
         new THREE.MeshBasicMaterial({ color: 0xffffff }),
     );
     marker.visible = false;
+    marker.userData.ink = false;   // a cursor, not a shape: never outlined
     world.add(marker);
 
     bindPointer();
@@ -647,7 +649,7 @@ export function frameTight(margin = 1.002) {
         placed: userPlaced,
     };
     frameCamera(margin);
-    renderer.render(scene, camera);
+    paint();
     return saved;
 }
 
@@ -662,7 +664,7 @@ export function restoreFrame(saved) {
     userPlaced = saved.placed;
     camera.updateProjectionMatrix();
     controls.update();
-    renderer.render(scene, camera);
+    paint();
 }
 
 /* ---------------------------------------------------------------------
@@ -1136,7 +1138,14 @@ export function render() {
         else world.rotation.y += rotationSpeed;
     }
 
+    paint();
+}
+
+/** The picture, and the outline over it if one is on — the live frame and
+ *  the export's capture alike. */
+function paint() {
     renderer.render(scene, camera);
+    drawOutline(renderer, scene, camera);
 }
 
 /* ---------------------------------------------------------------------

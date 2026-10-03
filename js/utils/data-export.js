@@ -4,6 +4,7 @@ import { currentTetradSet } from '../calculations/tetrahedron-updater.js';
 import { currentVolume } from '../tetrads/tetrad-volume.js';
 import { tetradModel, tetradSlice, tetradVolume } from '../tetrads/tetrad-state.js';
 import { equaveCents, centsToBary, sampleVolume } from '../tetrads/tetrad-geometry.js';
+import { drawOutline } from '../components/outline.js';
 
 export function exportToSVG() {
     const svgNS = "http://www.w3.org/2000/svg";
@@ -152,9 +153,11 @@ export function exportToPNG(filename = 'tetrads-export.png') {
        will be — so when the entropy field is showing, the PNG is the WebGL
        canvas, rendered once more and read straight back, at screen
        resolution. Read synchronously after the render, because the buffer
-       is not kept after the frame is composited. */
+       is not kept after the frame is composited. The outline, if it is on,
+       is part of the view, and goes with it. */
     if (tetradModel === 'he' && currentVolume() && (tetradSlice || tetradVolume) && renderer) {
         renderer.render(scene, camera);
+        drawOutline(renderer, scene, camera);
         const url = renderer.domElement.toDataURL('image/png');
         const a = document.createElement('a');
         a.href = url;

@@ -16,6 +16,7 @@ import {
 
 import { appMode } from '../app-mode.js';
 import { followProjection, refreshProjection, rayFrom, isOrtho } from './projection.js';
+import { drawOutline } from './outline.js';
 import { initAudio, stopChord, playChord } from '../components/audio-engine.js';
 import { sendMpePressure, mpeChannels } from '../midi/midi-output.js';
 import { updateMpePressureSliderUI } from '../utils/ui-handlers.js';
@@ -445,5 +446,6 @@ export function animate() {
 
     if (renderer && scene && camera) {
         renderer.render(scene, camera);
+        drawOutline(renderer, scene, camera);
     }
 }

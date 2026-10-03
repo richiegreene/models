@@ -152,17 +152,67 @@ void main() {
     outColor = vec4(shade(conc), 1.0);
 }`;
 
-const BODY_FRAG = COMMON + /* glsl */`
+/* The ray through the body, shared by the body and by its outline (BODY_INK_FRAG
+   below) so that the two cannot disagree about where the body is. */
+const RAY = /* glsl */`
 uniform vec3 uCam;
 uniform vec3 uCamDir;
 uniform float uOrtho;
-uniform float uOrbit;
 uniform float uDensity;
 uniform float uFocus;
 uniform int uSteps;
 uniform vec4 uCut;
 uniform float uCutOn;
 uniform float uScale;
+
+/* Back faces are drawn, so vLocal is where the ray LEAVES the shape and
+   the eye may be inside it; the entry is found from the four half-spaces
+   rather than assumed. In barycentric coordinates the ray is a straight
+   line, so each constraint is one division.
+
+   In orthographic every ray runs the one way the camera looks, and starts
+   where the camera's own plane is crossed under this pixel — the same eye,
+   slid across to stand in front of it.
+
+   False is a ray that misses: nothing to draw. */
+bool castRay(out vec3 eye, out vec3 dir, out vec3 b0, out vec3 bd, out float tmin, out float tmax) {
+    dir = uOrtho > 0.5 ? uCamDir : normalize(vLocal - uCam);
+    eye = uOrtho > 0.5 ? vLocal - dir * dot(vLocal - uCam, dir) : uCam;
+    b0 = toBary(eye);
+    bd = uToBary * dir;
+    vec4 c0 = vec4(b0, 1.0 - b0.x - b0.y - b0.z);
+    vec4 cd = vec4(bd, -(bd.x + bd.y + bd.z));
+    tmin = 0.0;
+    tmax = 1e9;
+    for (int i = 0; i < 4; i++) {
+        float a = c0[i], d = cd[i];
+        if (d < 0.0) tmax = min(tmax, -a / d);
+        else if (d > 0.0) tmin = max(tmin, -a / d);
+        else if (a < 0.0) return false;
+    }
+    /* The march stops at the cut when it crosses it inside the shape: the
+       section is opaque and already drawn, and what lies beyond it is the
+       part that has been opened up. A crossing outside the shape is a ray
+       that misses the section, and marches on. */
+    if (uCutOn > 0.5) {
+        float s0 = dot(uCut.xyz, b0) + uCut.w;
+        float sd = dot(uCut.xyz, bd);
+        if (abs(sd) > 1e-9) {
+            float ts = -s0 / sd;
+            if (ts > tmin) tmax = min(tmax, ts);
+        }
+    }
+    return tmax > tmin;
+}
+
+/* How much of what is left of the ray one step of length dt takes. */
+float deposit(float conc, float dt) {
+    return 1.0 - exp(-uDensity * pow(conc, uFocus) * dt * uScale);
+}
+`;
+
+const BODY_FRAG = COMMON + RAY + /* glsl */`
+uniform float uOrbit;
 uniform float uHtPxWorld;
 ` + HALFTONE_VOLUME_GLSL + /* glsl */`
 
@@ -183,41 +233,12 @@ float htValueAt(vec3 p) {
 }
 
 void main() {
-    /* Back faces are drawn, so vLocal is where the ray LEAVES the shape and
-       the eye may be inside it; the entry is found from the four half-spaces
-       rather than assumed. In barycentric coordinates the ray is a straight
-       line, so each constraint is one division. */
-    /* In orthographic every ray runs the one way the camera looks, and
-       starts where the camera's own plane is crossed under this pixel — the
-       same eye, slid across to stand in front of it. The halftone's marks
-       are then all as far away as the plane the frame is sized at. */
-    vec3 dir = uOrtho > 0.5 ? uCamDir : normalize(vLocal - uCam);
-    vec3 eye = uOrtho > 0.5 ? vLocal - dir * dot(vLocal - uCam, dir) : uCam;
+    vec3 eye, dir, b0, bd;
+    float tmin, tmax;
+    if (!castRay(eye, dir, b0, bd, tmin, tmax)) discard;
+    /* In orthographic the halftone's marks are all as far away as the plane
+       the frame is sized at. */
     htFlat = uOrtho > 0.5 ? uOrbit : 0.0;
-    vec3 b0 = toBary(eye);
-    vec3 bd = uToBary * dir;
-    vec4 c0 = vec4(b0, 1.0 - b0.x - b0.y - b0.z);
-    vec4 cd = vec4(bd, -(bd.x + bd.y + bd.z));
-    float tmin = 0.0, tmax = 1e9;
-    for (int i = 0; i < 4; i++) {
-        float a = c0[i], d = cd[i];
-        if (d < 0.0) tmax = min(tmax, -a / d);
-        else if (d > 0.0) tmin = max(tmin, -a / d);
-        else if (a < 0.0) discard;
-    }
-    /* The march stops at the cut when it crosses it inside the shape: the
-       section is opaque and already drawn, and what lies beyond it is the
-       part that has been opened up. A crossing outside the shape is a ray
-       that misses the section, and marches on. */
-    if (uCutOn > 0.5) {
-        float s0 = dot(uCut.xyz, b0) + uCut.w;
-        float sd = dot(uCut.xyz, bd);
-        if (abs(sd) > 1e-9) {
-            float ts = -s0 / sd;
-            if (ts > tmin) tmax = min(tmax, ts);
-        }
-    }
-    if (tmax <= tmin) discard;
 
     /* Screened on the shape: no haze at all. The body is a lattice of globes
        (or rods) hanging in the volume, each sized by the concordance at its
@@ -237,7 +258,7 @@ void main() {
         if (i >= uSteps) break;
         float t = tmin + (float(i) + 0.5) * dt;
         float conc = 1.0 - entropyAt(b0 + t * bd);
-        float a = 1.0 - exp(-uDensity * pow(conc, uFocus) * dt * uScale);
+        float a = deposit(conc, dt);
         acc += (1.0 - alpha) * a * shade(conc);
         alpha += (1.0 - alpha) * a;
         if (alpha > 0.985) break;
@@ -253,6 +274,54 @@ void main() {
         return;
     }
     outColor = vec4(acc, alpha);
+}`;
+
+/* The body as the outline sees it — see outline.js, which draws every shape
+   once more with its normal, its depth and which object it is, and inks the
+   edges it finds there. A volume has no surface for that pass to draw, so it
+   is given one: the surface of every well, taken where a well's own width of
+   the body at that point would be half opaque. Through the same Density and
+   Focus the body is drawn with, so the outline closes in on the cores as
+   Focus rises and swells with Density, exactly as the wells themselves do.
+
+   Where the ray crosses that surface is found between two steps of the march
+   rather than at one, so the edge's depth is smooth: snapped to the steps it
+   would come out terraced, and every terrace would be drawn as a line. Its
+   normal simply faces the eye, so a well is outlined where it ends and where
+   it passes in front of another, and never creased by the 8-bit grain of its
+   own gradient. */
+const BODY_INK_FRAG = COMMON + RAY + /* glsl */`
+uniform mat4 uInkModelView;
+uniform mat4 uInkProjection;
+uniform float uInkId;
+/* A well's width, in scene units: a 17 ¢ spread is a twentieth of an edge,
+   and a ray crosses one in about a tenth of a unit. */
+const float INK_WIDTH = 0.1;
+
+void main() {
+    vec3 eye, dir, b0, bd;
+    float tmin, tmax;
+    if (!castRay(eye, dir, b0, bd, tmin, tmax)) discard;
+
+    float dt = (tmax - tmin) / float(uSteps);
+    float hit = -1.0;
+    float tPrev = tmin, fPrev = -0.5;
+    for (int i = 0; i <= 512; i++) {
+        if (i > uSteps) break;
+        float t = tmin + float(i) * dt;
+        float f = deposit(1.0 - entropyAt(b0 + t * bd), INK_WIDTH) - 0.5;
+        if (f >= 0.0) {
+            hit = i == 0 ? t : mix(tPrev, t, -fPrev / max(1e-6, f - fPrev));
+            break;
+        }
+        tPrev = t;
+        fPrev = f;
+    }
+    if (hit < 0.0) discard;
+
+    vec4 clip = uInkProjection * (uInkModelView * vec4(eye + hit * dir, 1.0));
+    gl_FragDepth = clamp(clip.z / clip.w * 0.5 + 0.5, 0.0, 1.0);
+    outColor = vec4(0.5, 0.5, 1.0, uInkId);
 }`;
 
 /* ---------------------------------------------------------------------
@@ -360,6 +429,29 @@ export function attachField(gestureHandler, opts, sweepHandler) {
     body.visible = false;
     group.add(body);
 
+    /* ---- the body's outline ----
+       Its own uniforms are the body's, shared rather than copied, so a new
+       field, a new density or a moved cut reaches both at once. The two
+       matrices it projects its edge with are filled in here, before each
+       draw, for whichever camera is drawing. */
+    const ink = new THREE.ShaderMaterial({
+        glslVersion: THREE.GLSL3,
+        uniforms: {
+            ...body.material.uniforms,
+            uInkModelView: { value: new THREE.Matrix4() },
+            uInkProjection: { value: new THREE.Matrix4() },
+            uInkId: { value: 0 },
+        },
+        vertexShader: VERT,
+        fragmentShader: BODY_INK_FRAG,
+        side: THREE.BackSide,
+    });
+    body.userData.ink = ink;
+    body.onBeforeRender = (r, s, cam) => {
+        ink.uniforms.uInkModelView.value.multiplyMatrices(cam.matrixWorldInverse, body.matrixWorld);
+        ink.uniforms.uInkProjection.value.copy(cam.projectionMatrix);
+    };
+
     /* ---- the cut ---- */
     const cutGeo = new THREE.BufferGeometry();
     cutGeo.setAttribute('position', new THREE.Float32BufferAttribute(new Float32Array(9), 3));
@@ -399,6 +491,7 @@ export function attachField(gestureHandler, opts, sweepHandler) {
     );
     marker.renderOrder = 3;
     marker.visible = false;
+    marker.userData.ink = false;   // a cursor, not a shape: never outlined
     group.add(marker);
 
     bindPointer();
