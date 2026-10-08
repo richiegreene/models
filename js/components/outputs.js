@@ -23,7 +23,9 @@
  *
  * Kept in this browser between visits, device included: the setup is made
  * once, before the performance, and has to be there when the page is opened
- * on the night.
+ * on the night. All but the routing itself — splitting is for the piece, not
+ * for everyday playing, so every visit opens on Stereo Mix and the split is
+ * one press away, its rows as they were left.
  * ------------------------------------------------------------------ */
 
 import * as voice from '../synth/voice.js';
@@ -56,14 +58,13 @@ const allParts = (mode) => PARTS[mode].reduce((m, [, id]) => m | (1 << id), 0);
 
 const STORE = 'models.outputs.v1';
 const O = {
-    layout: 'mix',     // 'mix' | 'split' | 'multi'
+    layout: 'mix',     // 'mix' | 'split' | 'multi' — not stored: every visit opens on 'mix'
     device: '',        // '' is the system output
     deviceName: '',    // said while the device is unplugged
     routes: { dyads: oneEach('dyads'), triads: oneEach('triads'), tetrads: oneEach('tetrads') },
 };
 try {
     const s = JSON.parse(localStorage.getItem(STORE) || '{}');
-    if (['mix', 'split', 'multi'].includes(s.layout)) O.layout = s.layout;
     if (typeof s.device === 'string') O.device = s.device;
     if (typeof s.deviceName === 'string') O.deviceName = s.deviceName;
     for (const m of Object.keys(PARTS)) {
@@ -72,7 +73,10 @@ try {
         O.routes[m] = O.routes[m].map((d, i) => (Number.isInteger(r[i]) ? r[i] & allParts(m) : d));
     }
 } catch (e) {}
-const save = () => { try { localStorage.setItem(STORE, JSON.stringify(O)); } catch (e) {} };
+const save = () => {
+    const { layout, ...kept } = O;
+    try { localStorage.setItem(STORE, JSON.stringify(kept)); } catch (e) {}
+};
 
 /** The channels the device offers, as the browser last reported them. */
 let channels = 2;
